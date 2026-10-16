@@ -401,3 +401,51 @@ legend { padding: 0 6px; color: var(--muted); font-size: 12px; text-transform: u
 }
 @keyframes online-pulse { to { box-shadow: 0 0 0 8px transparent; } }
 @media (prefers-reduced-motion: reduce) { .online-count::before { animation: none; } }
+
+/* --- homepage: open lobbies and live matches -------------------------------------- */
+.lobbies { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 8px; }
+.room-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.room-list li {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 12px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line);
+}
+.room-list li div { display: grid; gap: 2px; min-width: 0; }
+.room-list b { font: 600 14px "JetBrains Mono", monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-list small { color: var(--muted); font-size: 12px; }
+.room-list li.empty { color: var(--muted); font-size: 13px; background: transparent; border-style: dashed; }
+.primary.small { padding: 6px 14px; font-size: 13px; flex: none; }
+.check { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; cursor: pointer; }
+.check input { accent-color: var(--accent); width: 16px; height: 16px; }
+@media (max-width: 480px) { .lobbies { grid-template-columns: 1fr; } }
+
+.masthead-top { align-items: center; }
+.sound-toggle {
+  margin: 0 0 6px; padding: 2px 6px; border: 1px solid var(--line); border-radius: 8px;
+  background: transparent; font-size: 14px; line-height: 1.2;
+}
+.sound-toggle:hover { border-color: var(--ink); }
+
+/* --- end of match: the result card ----------------------------------------------- */
+.final {
+  --tone: var(--draw);
+  margin-top: 12px; padding: 18px 20px 16px; border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--tone) 70%, transparent);
+  background: color-mix(in srgb, var(--tone) 10%, var(--card));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tone) 25%, transparent),
+    0 18px 50px -20px color-mix(in srgb, var(--tone) 60%, transparent);
+  animation: final-in 0.55s cubic-bezier(0.2, 1.3, 0.4, 1);
+}
+.final.win { --tone: var(--win); }
+.final.lose { --tone: var(--lose); }
+.final p { margin: 0; }
+.final .final-headline {
+  font: 800 clamp(30px, 4.2vw, 48px)/1.05 "Fraunces", serif; color: var(--tone); letter-spacing: -0.01em;
+}
+.final .final-score { font: 800 clamp(26px, 3vw, 36px)/1.1 "Fraunces", serif; color: var(--ink); }
+.final .final-detail { color: var(--muted); font-size: 13px; }
+@keyframes final-in { from { opacity: 0; scale: 0.9; translate: 0 12px; } }
+@media (prefers-reduced-motion: reduce) { .final { animation: none; } }
+.online-count { margin-left: auto; }
+/* Once the match is over the result card says it all; give its space back to the frames. */
+.play-main:has(#final:not([hidden])) .verdict,
+.play-main:has(#final:not([hidden])) .camera-status { display: none; }

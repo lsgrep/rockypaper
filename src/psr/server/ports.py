@@ -4,6 +4,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Protocol
 
+from psr.server.directory import RoomSummary
 from psr.server.state import RoomState, Timer
 
 
@@ -60,9 +61,20 @@ class PresenceBoard(Protocol):
     async def total(self) -> int: ...
 
 
+class RoomDirectory(Protocol):
+    """The public room list, shared by all instances."""
+
+    async def put(self, summary: RoomSummary) -> None: ...
+
+    async def remove(self, code: str) -> None: ...
+
+    async def list(self, now: float) -> list[RoomSummary]: ...
+
+
 @dataclass(frozen=True)
 class Backend:
     store: RoomStore
     bus: EventBus
     timers: TimerQueue
     presence: PresenceBoard
+    directory: RoomDirectory

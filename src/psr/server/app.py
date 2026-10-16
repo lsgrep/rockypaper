@@ -125,6 +125,21 @@ def create_app(
         """Players in a room or playing the computer, summed over all instances."""
         return JSONResponse({"players": await presence.total()})
 
+    @app.get("/api/rooms")
+    async def rooms() -> JSONResponse:
+        """Public rooms: open lobbies waiting for an opponent, and live matches."""
+        listed = await service.list_rooms()
+        return JSONResponse(
+            {
+                "open": [
+                    r.model_dump(exclude={"updated_at"}) for r in listed if r.status == "open"
+                ],
+                "live": [
+                    r.model_dump(exclude={"updated_at"}) for r in listed if r.status == "live"
+                ],
+            }
+        )
+
     @app.websocket("/ws")
     async def play(websocket: WebSocket) -> None:
         await websocket.accept()

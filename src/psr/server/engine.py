@@ -64,8 +64,8 @@ class Engine:
         self.timing = timing or Timing()
         self.rules = rules
 
-    def new_room(self, code: str, rounds: int) -> RoomState:
-        return RoomState(code=code, rounds=rounds)
+    def new_room(self, code: str, rounds: int, public: bool = True) -> RoomState:
+        return RoomState(code=code, rounds=rounds, public=public)
 
     def apply(self, state: RoomState, command: Command, now: float) -> Outcome:
         turn = _Turn(self, state.model_copy(deep=True), now)

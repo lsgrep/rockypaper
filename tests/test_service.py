@@ -10,6 +10,7 @@ from psr.server.engine import Engine, Timing
 from psr.server.memory import (
     MemoryEventBus,
     MemoryPresenceBoard,
+    MemoryRoomDirectory,
     MemoryRoomStore,
     MemoryTimerQueue,
 )
@@ -162,7 +163,9 @@ class RacingStore:
 
 def _racing_backend() -> tuple[Backend, RacingStore]:
     store = RacingStore(Engine(TIMING), Clock())
-    return Backend(store, MemoryEventBus(), MemoryTimerQueue(), MemoryPresenceBoard()), store
+    return Backend(
+        store, MemoryEventBus(), MemoryTimerQueue(), MemoryPresenceBoard(), MemoryRoomDirectory()
+    ), store
 
 
 class AlwaysStaleStore(RacingStore):
@@ -179,7 +182,9 @@ def test_gives_up_under_constant_contention_and_retries_the_timer_later() -> Non
         store = AlwaysStaleStore(Engine(TIMING), clock)
         timers = MemoryTimerQueue()
         service = RoomService(
-            Backend(store, MemoryEventBus(), timers, MemoryPresenceBoard()), Engine(TIMING), clock
+            Backend(store, MemoryEventBus(), timers, MemoryPresenceBoard(), MemoryRoomDirectory()),
+            Engine(TIMING),
+            clock,
         )
         code = await service.create_room(rounds=1)
 
@@ -199,7 +204,11 @@ def test_timer_for_a_deleted_room_is_dropped() -> None:
     async def scenario() -> None:
         clock = Clock()
         backend = Backend(
-            MemoryRoomStore(), MemoryEventBus(), MemoryTimerQueue(), MemoryPresenceBoard()
+            MemoryRoomStore(),
+            MemoryEventBus(),
+            MemoryTimerQueue(),
+            MemoryPresenceBoard(),
+            MemoryRoomDirectory(),
         )
         service = RoomService(backend, Engine(TIMING), clock)
         await backend.timers.schedule(Timer("GONE", "round", 1, at=clock.now))

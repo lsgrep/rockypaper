@@ -3,11 +3,12 @@
 
 import { ThrowInput, handCam } from "./hand-cam.js";
 import { socketUrl } from "./net.js";
+import { play } from "./sound.js";
 import {
   $, CONCEALED, GLYPHS, clearOutcome, createMoveButtons, renderReveal, resetBoard, setBadge,
   setHand, setRound, setScore, setVerdict, show, showFinal, toast,
 } from "./ui.js";
-import { onlineRevealView, reconnectDelay, scoreForSeat } from "./views.js";
+import { matchResultView, onlineRevealView, reconnectDelay, scoreForSeat } from "./views.js";
 
 const MOVES = ["rock", "paper", "scissors"];
 const SEAT_KEY = (room) => `psr:seat:${room}`;
@@ -108,6 +109,7 @@ export class OnlineGame {
   }
 
   #onLobby({ players }) {
+    if (players.length > this.#players.length && this.#players.length > 0) play("join");
     this.#players = players;
     $("lobby-players").replaceChildren(
       ...players.map((name, i) => {
@@ -166,9 +168,10 @@ export class OnlineGame {
 
   #onReveal(message) {
     this.#roundAbort?.abort();
-    renderReveal(onlineRevealView(message, this.#seat, this.#opponent));
+    const view = onlineRevealView(message, this.#seat, this.#opponent);
+    renderReveal(view);
     if (message.is_over) {
-      showFinal(message.summary, {
+      showFinal(matchResultView(view.score, this.#opponent), {
         againLabel: "Rematch",
         onAgain: () => this.#send({ type: "rematch" }),
         onLeave: () => this.leave(),

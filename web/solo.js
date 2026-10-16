@@ -6,7 +6,7 @@ import {
   $, CONCEALED, GLYPHS, clearOutcome, createMoveButtons, renderReveal, resetBoard, setBadge, setHand, setVerdict,
   show, showFinal,
 } from "./ui.js";
-import { soloRevealView } from "./views.js";
+import { matchResultView, soloRevealView } from "./views.js";
 
 const PYODIDE_VERSION = "0.26.4";
 const PYODIDE_INDEX = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
@@ -94,9 +94,11 @@ async function playRounds(session, input, signal, { onExit, onReplay }) {
     const proxy = session.play(move);
     const result = proxy.toJs({ dict_converter: Object.fromEntries });
     proxy.destroy();
-    renderReveal(soloRevealView(result, photo));
+    const view = soloRevealView(result, photo);
+    renderReveal(view);
     if (result.is_over) {
-      showFinal(result.summary, { againLabel: "Play again", onAgain: onReplay, onLeave: onExit });
+      const actions = { againLabel: "Play again", onAgain: onReplay, onLeave: onExit };
+      showFinal(matchResultView(view.score, "Computer"), actions);
       return;
     }
     await sleep(RESULT_MS, signal);

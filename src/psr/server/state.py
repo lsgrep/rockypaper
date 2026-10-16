@@ -39,6 +39,7 @@ class RoomState(BaseModel):
 
     code: str
     rounds: int
+    public: bool = True  # listed on the homepage
     version: int = 0
     phase: Phase = Phase.LOBBY
     seats: list[SeatState] = []

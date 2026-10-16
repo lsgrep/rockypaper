@@ -64,3 +64,39 @@ export function onlineLabel(players) {
   if (players === 0) return "No one online yet";
   return players === 1 ? "1 player online" : `${players} players online`;
 }
+
+// Homepage room list entries (from GET /api/rooms).
+export function openRoomView(room) {
+  return {
+    code: room.code,
+    title: `${room.players[0]} is waiting`,
+    detail: `${room.rounds} ${room.rounds === 1 ? "round" : "rounds"} · room ${room.code}`,
+  };
+}
+
+export function liveRoomView(room) {
+  const [first, second] = room.players;
+  const draws = room.draws ? ` (${room.draws} ${room.draws === 1 ? "draw" : "draws"})` : "";
+  return {
+    code: room.code,
+    title: `${first} vs ${second}`,
+    detail: `Round ${Math.max(room.round, 1)} of ${room.rounds} · ${room.wins[0]}–${room.wins[1]}${draws}`,
+  };
+}
+
+// End-of-match card, from the board's score ({ left: you, right: them, draws }).
+export function matchResultView(score, opponent) {
+  const outcome = score.left === score.right ? "draw" : score.left > score.right ? "win" : "lose";
+  const headlines = {
+    win: "You win the match!",
+    lose: `${opponent} wins the match`,
+    draw: "Match drawn",
+  };
+  const draws = score.draws ? `${score.draws} ${score.draws === 1 ? "draw" : "draws"}` : "no draws";
+  return {
+    outcome,
+    headline: headlines[outcome],
+    score: `${score.left} – ${score.right}`,
+    detail: `You ${score.left} · ${opponent} ${score.right} · ${draws}`,
+  };
+}

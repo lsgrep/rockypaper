@@ -5,6 +5,7 @@ import asyncio
 import pytest
 from conftest import BACKENDS, BackendFactory, run, wait_until
 
+from psr.server.directory import STALE_SECONDS, RoomSummary
 from psr.server.ports import Envelope
 from psr.server.state import RoomState, Timer
 
@@ -105,5 +106,34 @@ def test_presence_sums_live_instances_and_forgets_dead_ones(
             assert await board.total() == 3
             await asyncio.sleep(0.3)  # app-1 stopped reporting (crashed)
             assert await board.total() == 2
+
+    run(scenario)
+
+
+def test_directory_lists_newest_first_and_drops_stale_rooms(make_backend: BackendFactory) -> None:
+    async def scenario() -> None:
+        async with make_backend() as backend:
+            directory = backend.directory
+
+            def summary(code: str, at: float) -> RoomSummary:
+                return RoomSummary(
+                    code=code,
+                    status="open",
+                    players=["A"],
+                    rounds=3,
+                    round=0,
+                    wins=[0, 0],
+                    draws=0,
+                    updated_at=at,
+                )
+
+            await directory.put(summary("OLD1", at=3500.0))
+            await directory.put(summary("NEW1", at=5000.0))
+            await directory.put(summary("MID1", at=4000.0))
+            assert [r.code for r in await directory.list(now=5000.0)] == ["NEW1", "MID1", "OLD1"]
+
+            await directory.remove("MID1")
+            later = 3500.0 + STALE_SECONDS + 1  # OLD1 has not been refreshed since
+            assert [r.code for r in await directory.list(now=later)] == ["NEW1"]
 
     run(scenario)

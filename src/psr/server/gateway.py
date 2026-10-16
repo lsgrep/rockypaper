@@ -48,9 +48,9 @@ class Gateway:
 
     async def handle(self, message: ClientMessage) -> None:
         match message:
-            case CreateRoom(name=name, rounds=rounds):
+            case CreateRoom(name=name, rounds=rounds, public=public):
                 self._require_outside()
-                code = await self._service.create_room(rounds)
+                code = await self._service.create_room(rounds, public)
                 token = secrets.token_urlsafe(16)
                 await self._enter(code, token, Join(token, name))
             case JoinRoom(name=name, room=code):

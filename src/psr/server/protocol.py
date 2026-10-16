@@ -35,6 +35,7 @@ class CreateRoom(Message):
     type: Literal["create"] = "create"
     name: PlayerName
     rounds: Annotated[int, Field(ge=1, le=MAX_ROUNDS)]
+    public: bool = True  # listed on the homepage; private rooms are joined by code only
 
 
 class JoinRoom(Message):

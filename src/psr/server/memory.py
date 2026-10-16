@@ -4,6 +4,7 @@ import time
 from collections import defaultdict
 from collections.abc import Callable
 
+from psr.server.directory import STALE_SECONDS, RoomSummary
 from psr.server.ports import Backend, Envelope, Handler
 from psr.server.state import RoomState, Timer
 
@@ -98,5 +99,28 @@ class MemoryPresenceBoard:
         return sum(count for count, expires in self._reports.values() if expires > now)
 
 
+class MemoryRoomDirectory:
+    def __init__(self) -> None:
+        self._rooms: dict[str, RoomSummary] = {}
+
+    async def put(self, summary: RoomSummary) -> None:
+        self._rooms[summary.code] = summary
+
+    async def remove(self, code: str) -> None:
+        self._rooms.pop(code, None)
+
+    async def list(self, now: float) -> list[RoomSummary]:
+        for code, summary in list(self._rooms.items()):
+            if summary.updated_at < now - STALE_SECONDS:
+                del self._rooms[code]
+        return sorted(self._rooms.values(), key=lambda s: s.updated_at, reverse=True)
+
+
 def memory_backend() -> Backend:
-    return Backend(MemoryRoomStore(), MemoryEventBus(), MemoryTimerQueue(), MemoryPresenceBoard())
+    return Backend(
+        MemoryRoomStore(),
+        MemoryEventBus(),
+        MemoryTimerQueue(),
+        MemoryPresenceBoard(),
+        MemoryRoomDirectory(),
+    )

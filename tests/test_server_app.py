@@ -274,3 +274,55 @@ def test_site_files_are_revalidated_but_the_model_is_cached(tmp_path: Path) -> N
         assert client.get("/").headers["cache-control"] == "no-cache"
         assert client.get("/api/online").headers["cache-control"] == "no-cache"
         assert "max-age=86400" in client.get("/vendor/model.task").headers["cache-control"]
+
+
+def test_homepage_lists_open_lobbies_then_live_matches_across_instances() -> None:
+    server = FakeServer()
+    first = create_app(redis=FakeRedis(server=server), timing=FAST, timer_poll=0.01)
+    second = create_app(redis=FakeRedis(server=server), timing=FAST, timer_poll=0.01)
+    with TestClient(first) as one, TestClient(second) as two:
+        assert two.get("/api/rooms").json() == {"open": [], "live": []}
+        with one.websocket_connect("/ws") as alice, two.websocket_connect("/ws") as bob:
+            alice.send_json({"type": "create", "name": "Alice", "rounds": 3})
+            code = receive_until(alice, "joined")["room"]
+            assert two.get("/api/rooms").json() == {
+                "open": [
+                    {
+                        "code": code,
+                        "status": "open",
+                        "players": ["Alice"],
+                        "rounds": 3,
+                        "round": 0,
+                        "wins": [0, 0],
+                        "draws": 0,
+                    }
+                ],
+                "live": [],
+            }
+
+            bob.send_json({"type": "join", "name": "Bob", "room": code})
+            receive_until(alice, "round")
+            listing = one.get("/api/rooms").json()
+            assert listing["open"] == []
+            assert listing["live"][0]["players"] == ["Alice", "Bob"]
+            assert listing["live"][0]["round"] == 1
+
+            alice.send_json({"type": "move", "move": "rock"})
+            bob.send_json({"type": "move", "move": "scissors"})
+            receive_until(alice, "reveal")
+            assert one.get("/api/rooms").json()["live"][0]["wins"] == [1, 0]
+
+            alice.send_json({"type": "leave"})
+            bob.send_json({"type": "leave"})
+            receive_until(bob, "lobby")
+        assert two.get("/api/rooms").json() == {"open": [], "live": []}
+
+
+def test_private_rooms_are_not_listed() -> None:
+    with TestClient(create_app(timing=FAST)) as client, client.websocket_connect("/ws") as ws:
+        ws.send_json({"type": "create", "name": "Alice", "rounds": 1, "public": False})
+        code = receive_until(ws, "joined")["room"]
+        assert client.get("/api/rooms").json() == {"open": [], "live": []}
+        with client.websocket_connect("/ws") as bob:  # still joinable by code
+            bob.send_json({"type": "join", "name": "Bob", "room": code})
+            assert receive_until(bob, "joined")["seat"] == 1

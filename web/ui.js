@@ -1,5 +1,6 @@
 // Shared DOM rendering for both game modes. Modes pass plain view data in.
 
+import { play } from "./sound.js";
 import { countdownLabel, nextTickMs } from "./views.js";
 
 export const GLYPHS = { rock: "✊", paper: "✋", scissors: "✌️" };
@@ -75,6 +76,7 @@ export function createMoveButtons(moves, onPick) {
 }
 
 export function markSelected(move) {
+  if (move) play("select");
   for (const button of $("moves").querySelectorAll("button")) {
     button.classList.toggle("selected", button.dataset.move === move);
   }
@@ -116,6 +118,7 @@ export function renderReveal(view) {
   setBadge("left", "");
   setBadge("right", "");
   playOutcome(view.outcome);
+  play(view.outcome);
   setVerdict(view.headline, view.rule ?? "Same hands, no winner.", view.outcome);
   setScore(view.score);
   setRound(view.round, view.rounds);
@@ -127,6 +130,8 @@ export function renderReveal(view) {
 
 const OUTCOMES = ["win", "lose", "draw"];
 const CONFETTI_PIECES = 28;
+const MATCH_CONFETTI = 90;
+const MATCH_SOUND_DELAY_MS = 450;
 const CONFETTI_COLORS = ["var(--win)", "var(--accent)", "var(--ink)"];
 const CONFETTI_MS = 1400;
 
@@ -150,11 +155,11 @@ export function clearOutcome() {
   setPhoto("right", null);
 }
 
-function burstConfetti(arena) {
+function burstConfetti(arena, pieces = CONFETTI_PIECES) {
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const layer = document.createElement("div");
   layer.className = "confetti";
-  for (let i = 0; i < CONFETTI_PIECES; i++) {
+  for (let i = 0; i < pieces; i++) {
     const piece = document.createElement("i");
     const angle = Math.random() * Math.PI * 2;
     const distance = 70 + Math.random() * 130;
@@ -186,14 +191,21 @@ function addHistory({ round, leftMove, rightMove, outcome }) {
   $("history").prepend(item);
 }
 
-export function showFinal(summary, { againLabel, onAgain, onLeave }) {
-  $("summary").textContent = summary;
+// End of the match: a big result card. `result` comes from views.matchResultView.
+export function showFinal(result, { againLabel, onAgain, onLeave }) {
+  const card = $("final");
+  card.className = `final ${result.outcome}`;
+  $("final-headline").textContent = result.headline;
+  $("final-score").textContent = result.score;
+  $("final-detail").textContent = result.detail;
   $("again").textContent = againLabel;
   $("again").disabled = false;
   $("again").onclick = onAgain;
   $("leave").onclick = onLeave;
-  $("final").hidden = false;
+  card.hidden = false;
   $("moves").hidden = true;
+  if (result.outcome === "win") burstConfetti($("arena"), MATCH_CONFETTI);
+  setTimeout(() => play(`match-${result.outcome}`), MATCH_SOUND_DELAY_MS); // after the round's own sound
 }
 
 // Big "3, 2, 1, Go!" in the arena. Resolves at zero, or at once if `signal` aborts;
@@ -224,11 +236,15 @@ export function runCountdown(ms, { finalLabel = "Go!", signal } = {}) {
       if (signal?.aborted) return;
       const left = end - performance.now();
       if (left <= 0) {
+        play("go");
         finish(finalLabel);
         return;
       }
       const label = countdownLabel(left);
-      if (el.textContent !== label) pop(el, label);
+      if (el.textContent !== label) {
+        pop(el, label);
+        play(label === "1" ? "lastTick" : "tick");
+      }
       timer = setTimeout(tick, nextTickMs(left));
     };
     tick();

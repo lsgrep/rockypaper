@@ -3,6 +3,7 @@
 - Room state: a hash {v: version, s: JSON}, written by a Lua compare-and-set.
 - Events: one pattern subscription per instance; handlers filter by room.
 - Presence: one expiring counter key per instance, summed on read.
+- Directory: one hash of public room summaries; stale entries are pruned on read.
 - Timers: a sorted set scored by due time; claiming re-scores a timer to now + lease
   in one Lua call, so exactly one instance runs it, and it reappears if that one dies.
 """
@@ -16,6 +17,7 @@ from typing import Any
 
 from redis.asyncio import Redis
 
+from psr.server.directory import STALE_SECONDS, RoomSummary
 from psr.server.ports import Backend, Envelope, Handler
 from psr.server.state import RoomState, Timer
 
@@ -25,6 +27,7 @@ ROOM_PREFIX = "psr:room:"
 EVENTS_PREFIX = "psr:events:"
 TIMERS_KEY = "psr:timers"
 PRESENCE_PREFIX = "psr:online:"
+DIRECTORY_KEY = "psr:rooms"
 ROOM_TTL_SECONDS = 6 * 60 * 60  # idle rooms disappear on their own
 
 SAVE_IF_VERSION = """
@@ -188,6 +191,26 @@ class RedisPresenceBoard:
         return sum(int(value) for value in await self._redis.mget(keys) if value is not None)
 
 
+class RedisRoomDirectory:
+    def __init__(self, redis: Redis) -> None:
+        self._redis = redis
+
+    async def put(self, summary: RoomSummary) -> None:
+        await self._redis.hset(DIRECTORY_KEY, summary.code, summary.model_dump_json())
+
+    async def remove(self, code: str) -> None:
+        await self._redis.hdel(DIRECTORY_KEY, code)
+
+    async def list(self, now: float) -> list[RoomSummary]:
+        raw = await self._redis.hgetall(DIRECTORY_KEY)
+        rooms = [RoomSummary.model_validate_json(value) for value in raw.values()]
+        stale = [r.code for r in rooms if r.updated_at < now - STALE_SECONDS]
+        if stale:
+            await self._redis.hdel(DIRECTORY_KEY, *stale)
+        fresh = [r for r in rooms if r.code not in stale]
+        return sorted(fresh, key=lambda r: r.updated_at, reverse=True)
+
+
 def _encode(timer: Timer) -> str:
     return json.dumps([timer.room, timer.name, timer.token, timer.at])
 
@@ -203,5 +226,11 @@ def _text(value: str | bytes) -> str:
 
 def redis_backend(redis: Redis) -> tuple[Backend, RedisEventBus]:
     bus = RedisEventBus(redis)
-    backend = Backend(RedisRoomStore(redis), bus, RedisTimerQueue(redis), RedisPresenceBoard(redis))
+    backend = Backend(
+        RedisRoomStore(redis),
+        bus,
+        RedisTimerQueue(redis),
+        RedisPresenceBoard(redis),
+        RedisRoomDirectory(redis),
+    )
     return backend, bus

@@ -3,6 +3,9 @@ import { describe, it } from "node:test";
 
 import {
   countdownLabel,
+  matchResultView,
+  liveRoomView,
+  openRoomView,
   isRoomCode,
   nextTickMs,
   onlineLabel,
@@ -157,5 +160,52 @@ describe("onlineLabel", () => {
     assert.equal(onlineLabel(0), "No one online yet");
     assert.equal(onlineLabel(1), "1 player online");
     assert.equal(onlineLabel(12), "12 players online");
+  });
+});
+
+describe("room list", () => {
+  it("describes an open lobby", () => {
+    const room = { code: "K7QX", players: ["Ada"], rounds: 3, round: 0, wins: [0, 0], draws: 0 };
+    assert.deepEqual(openRoomView(room), {
+      code: "K7QX",
+      title: "Ada is waiting",
+      detail: "3 rounds · room K7QX",
+    });
+    assert.equal(openRoomView({ ...room, rounds: 1 }).detail, "1 round · room K7QX");
+  });
+
+  it("describes a live match with its score", () => {
+    const room = { code: "K7QX", players: ["Ada", "Bo"], rounds: 5, round: 3, wins: [2, 0], draws: 1 };
+    assert.deepEqual(liveRoomView(room), {
+      code: "K7QX",
+      title: "Ada vs Bo",
+      detail: "Round 3 of 5 · 2–0 (1 draw)",
+    });
+    assert.equal(liveRoomView({ ...room, draws: 0 }).detail, "Round 3 of 5 · 2–0");
+  });
+});
+
+describe("matchResultView", () => {
+  it("celebrates a win", () => {
+    assert.deepEqual(matchResultView({ left: 2, right: 1, draws: 2 }, "Computer"), {
+      outcome: "win",
+      headline: "You win the match!",
+      score: "2 – 1",
+      detail: "You 2 · Computer 1 · 2 draws",
+    });
+  });
+
+  it("names the opponent when they win", () => {
+    const view = matchResultView({ left: 0, right: 3, draws: 0 }, "Bo");
+    assert.equal(view.outcome, "lose");
+    assert.equal(view.headline, "Bo wins the match");
+    assert.equal(view.detail, "You 0 · Bo 3 · no draws");
+  });
+
+  it("calls a level score a draw", () => {
+    const view = matchResultView({ left: 1, right: 1, draws: 1 }, "Bo");
+    assert.equal(view.outcome, "draw");
+    assert.equal(view.headline, "Match drawn");
+    assert.equal(view.detail, "You 1 · Bo 1 · 1 draw");
   });
 });

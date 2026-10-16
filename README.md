@@ -28,8 +28,8 @@ WebSocket upgrades to `/ws`). Browsers only allow the camera on `https://` or
 ## Testing
 
 ```sh
-uv run pytest                               # Python: 106 tests (+7 need real Redis), ~4 s
-node --test web/tests/*.test.js             # browser logic: 31 tests, no dependencies
+uv run pytest                               # Python: 113 tests (+8 need real Redis), ~4 s
+node --test web/tests/*.test.js             # browser logic: 38 tests, no dependencies
 uv run ruff check . && uv run ruff format --check . && uv run mypy   # lint + strict types
 
 uv run pytest --cov=psr --cov=scripts --cov-report=term-missing     # 97% line coverage
@@ -54,11 +54,12 @@ I/O-bound parts take their dependencies as arguments:
 | `test_rules.py`, `test_game.py`, `test_presentation.py` | Rule table validation, rounds, scoring, choosers (incl. the computer committing first), text |
 | `test_cli.py`, `test_web.py` | Console game end to end with fake I/O; the Pyodide session adapter |
 | `test_engine.py` | Every room rule: hidden moves and photos, latest move counts, deadline and grace, replay/abandon, rematch, leave, disconnect/resume, stale timers |
-| `test_backends.py` | Store compare-and-set, pub/sub routing, timer leases, presence expiry, for memory, fakeredis and (optionally) Redis |
+| `test_backends.py` | Store compare-and-set, pub/sub routing, timer leases, presence expiry, room directory, for memory, fakeredis and (optionally) Redis |
+| `test_directory.py` | Which rooms are listed (open, live, private, finished) and their score |
 | `test_service.py` | Two instances sharing a room, timer takeover after a crash, retry on conflict, giving up under contention |
 | `test_server_app.py` | Real WebSockets: full match, a match split across two instances, photos, online count across instances, resume, leave, rematch, errors, health checks |
 | `test_scripts.py` | Site build, model download (incl. interrupted downloads), and the load test playing real matches against a live server |
-| `web/tests/*.test.js` | Gesture classification and fallback, debounce, hold detection, reveal/score views from each seat, countdown, reconnect backoff |
+| `web/tests/*.test.js` | Gesture classification and fallback, debounce, hold detection, reveal/score/match-result views from each seat, room list wording, countdown, reconnect backoff, sound definitions and mute |
 
 Not automated: the camera itself and the DOM. Those were checked in headless
 Chrome with a fake camera fed a hand photo (`--use-file-for-fake-video-capture`).
@@ -85,6 +86,16 @@ round replays and the computer keeps its committed move.
    Late moves are rejected; if someone showed nothing the round replays (twice max).
 6. A dropped player keeps their seat for 20 s and the client resumes automatically.
 
+The homepage lists **open lobbies** (one player waiting, with a Join button) and
+**live matches** (names, round and score), from `GET /api/rooms`. Rooms are public
+by default; untick "List in public lobby" to make one joinable by code only. The
+service updates a small shared directory of room summaries whenever a room
+changes and removes it when the room closes.
+
+Sound effects (countdown ticks, the throw, round and match results, an opponent
+joining) are synthesized with the Web Audio API, so there are no audio files; the
+header button mutes them.
+
 Photos only ever go to the opponent in the same room. The server keeps them in
 the room's state until the next round starts and stores them nowhere else; the
 on-screen prompt says a photo is taken at zero. Without a camera the reveal just
@@ -97,7 +108,8 @@ shows the move.
                                                    ├ room:{code}  state, compare-and-set
                                                    ├ events:*     pub/sub fan-out
                                                    ├ timers       leased sorted set
-                                                   └ online:{app} expiring player count
+                                                   ├ online:{app} expiring player count
+                                                   └ rooms        public room summaries
 ```
 
 - `server/engine.py` is the room's rules as a pure function `(state, command, now)

@@ -1,6 +1,8 @@
 // Entry point: mode selection and setup forms.
 
+import { fetchLobbies, renderLobbies } from "./lobbies.js";
 import { OnlineGame, storedSeat } from "./online.js";
+import { isMuted, play, setMuted, unlockOnFirstGesture } from "./sound.js";
 import { startSolo } from "./solo.js";
 import { $, readRounds, show, toast, wireSteppers } from "./ui.js";
 import { isRoomCode, onlineLabel } from "./views.js";
@@ -8,6 +10,7 @@ import { isRoomCode, onlineLabel } from "./views.js";
 const NAME_KEY = "psr:name";
 const ONLINE_POLL_MS = 10_000;
 const PRESENCE_SETTLE_MS = 1_000;
+const LOBBY_POLL_MS = 4_000;
 
 function remember(key, value) {
   try { localStorage.setItem(key, value); } catch { /* storage unavailable */ }
@@ -19,6 +22,33 @@ function recall(key) {
 
 function goHome() {
   show("home");
+  refreshLobbies();
+}
+
+function startOnline(request) {
+  new OnlineGame({ onExit: () => show("online-setup") }).start(request);
+  setTimeout(refreshOnlineCount, PRESENCE_SETTLE_MS);
+}
+
+// From the homepage list: join straight away if we know the player's name.
+function joinListedRoom(code) {
+  const name = recall(NAME_KEY);
+  if (name) {
+    startOnline({ type: "join", name, room: code });
+    return;
+  }
+  $("room-code").value = code;
+  show("online-setup");
+  $("player-name").focus();
+}
+
+async function refreshLobbies() {
+  if ($("home").hidden) return;
+  try {
+    renderLobbies(await fetchLobbies(), joinListedRoom);
+  } catch {
+    renderLobbies({ open: [], live: [] }, joinListedRoom);
+  }
 }
 
 async function playSolo(rounds) {
@@ -67,9 +97,13 @@ function wireOnlineSetup() {
     }
     const request = joining
       ? { type: "join", name, room: code }
-      : { type: "create", name, rounds: readRounds($("online-rounds")) ?? 3 };
-    new OnlineGame({ onExit: () => show("online-setup") }).start(request);
-    setTimeout(refreshOnlineCount, PRESENCE_SETTLE_MS);
+      : {
+          type: "create",
+          name,
+          rounds: readRounds($("online-rounds")) ?? 3,
+          public: $("room-public").checked,
+        };
+    startOnline(request);
   });
 }
 
@@ -92,12 +126,35 @@ function watchOnlineCount() {
   setInterval(() => {
     if (!document.hidden) refreshOnlineCount();
   }, ONLINE_POLL_MS);
+  setInterval(() => {
+    if (!document.hidden) refreshLobbies();
+  }, LOBBY_POLL_MS);
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) refreshOnlineCount();
+    if (document.hidden) return;
+    refreshOnlineCount();
+    refreshLobbies();
   });
 }
 
+function wireSoundToggle() {
+  const button = $("sound-toggle");
+  const render = () => {
+    const on = !isMuted();
+    button.textContent = on ? "🔊" : "🔇";
+    button.setAttribute("aria-pressed", String(on));
+    button.title = button.ariaLabel = on ? "Sound on" : "Sound off";
+  };
+  button.addEventListener("click", () => {
+    setMuted(!isMuted());
+    render();
+    play("select");
+  });
+  render();
+  unlockOnFirstGesture();
+}
+
 function main() {
+  wireSoundToggle();
   watchOnlineCount();
   wireSteppers();
   wireSoloSetup();

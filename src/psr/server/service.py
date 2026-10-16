@@ -6,6 +6,7 @@ import string
 import time
 from collections.abc import Callable
 
+from psr.server.directory import RoomSummary, summarize
 from psr.server.engine import Engine
 from psr.server.ports import Backend, Envelope
 from psr.server.state import Command, Fire, Outcome, ProtocolError
@@ -34,10 +35,10 @@ class RoomService:
         self._engine = engine
         self._clock = clock
 
-    async def create_room(self, rounds: int) -> str:
+    async def create_room(self, rounds: int, public: bool = True) -> str:
         for _ in range(MAX_ATTEMPTS):
             code = "".join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LENGTH))
-            if await self._backend.store.create(self._engine.new_room(code, rounds)):
+            if await self._backend.store.create(self._engine.new_room(code, rounds, public)):
                 return code
         raise ConflictError("Could not allocate a room code")
 
@@ -56,8 +57,12 @@ class RoomService:
                 committed = await store.save(outcome.state, state.version)
             if committed:
                 await self._publish(code, outcome)
+                await self._update_directory(code, outcome)
                 return
         raise ConflictError(f"Room {code} is too busy")
+
+    async def list_rooms(self) -> list[RoomSummary]:
+        return await self._backend.directory.list(self._clock())
 
     async def fire_due_timers(self) -> int:
         """Run timers that came due; returns how many were claimed."""
@@ -73,6 +78,14 @@ class RoomService:
                 continue  # leave it leased so it comes due again
             await timers.complete(timer)
         return len(due)
+
+    async def _update_directory(self, code: str, outcome: Outcome) -> None:
+        directory = self._backend.directory
+        summary = None if outcome.state is None else summarize(outcome.state, self._clock())
+        if summary is None:
+            await directory.remove(code)
+        else:
+            await directory.put(summary)
 
     async def _publish(self, code: str, outcome: Outcome) -> None:
         for timer in outcome.timers:

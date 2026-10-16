@@ -20,6 +20,7 @@
       <div class="masthead-top">
         <p class="eyebrow">Best of n</p>
         <p id="online-count" class="online-count" aria-live="polite" hidden></p>
+        <button id="sound-toggle" type="button" class="sound-toggle" aria-pressed="true" aria-label="Sound on" title="Sound on">🔊</button>
       </div>
       <h1>Paper <span>Scissors</span> Rock</h1>
     </header>
@@ -33,6 +34,16 @@
         <button type="button" class="mode" data-mode="online">
           <span class="glyph">📷</span><b>vs a friend</b><small>Live, throw with your camera</small>
         </button>
+      </div>
+      <div class="lobbies">
+        <section>
+          <h2 class="side-title">Open lobbies</h2>
+          <ul id="open-rooms" class="room-list"></ul>
+        </section>
+        <section>
+          <h2 class="side-title">Live now</h2>
+          <ul id="live-rooms" class="room-list"></ul>
+        </section>
       </div>
     </section>
 
@@ -72,6 +83,7 @@
               <input id="online-rounds" type="number" min="1" max="99" value="3" inputmode="numeric" aria-label="Rounds">
               <button type="button" data-step="1" aria-label="More rounds">+</button>
             </div>
+            <label class="check"><input id="room-public" type="checkbox" checked> List in public lobby</label>
             <button type="submit" value="create" class="primary">Create room</button>
           </fieldset>
           <fieldset>
@@ -128,7 +140,9 @@
         <div id="moves" class="moves" role="group" aria-label="Choose your move"></div>
 
         <div id="final" class="final" hidden>
-          <p id="summary"></p>
+          <p id="final-headline" class="final-headline"></p>
+          <p id="final-score" class="final-score"></p>
+          <p id="final-detail" class="final-detail"></p>
           <div class="final-actions">
             <button id="again" type="button" class="primary">Play again</button>
             <button id="leave" type="button" class="link">Leave</button>
