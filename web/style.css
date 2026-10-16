@@ -152,6 +152,8 @@ h1 span { color: var(--accent); font-style: italic; font-weight: 500; }
 .history .draw .tag { color: var(--draw); }
 
 .foot { margin-top: 24px; text-align: center; color: var(--muted); font-size: 12px; }
+.foot a { color: var(--ink); text-underline-offset: 3px; }
+.foot a:hover { color: var(--accent); }
 
 @media (prefers-reduced-motion: reduce) {
   .arena.shaking .hand { animation: none; }
@@ -284,17 +286,39 @@ legend { padding: 0 6px; color: var(--muted); font-size: 12px; text-transform: u
 .history:empty::before { content: "No rounds yet"; color: var(--muted); font-size: 13px; }
 
 @media (min-width: 960px) {
-  .shell:has(#play:not([hidden])) { max-width: 1080px; padding-top: 24px; }
-  .shell:has(#play:not([hidden])) .masthead { margin-bottom: 16px; }
-  .shell:has(#play:not([hidden])) h1 { font-size: 40px; }
-  .shell:has(#play:not([hidden])) .foot { margin-top: 12px; }
-  #play:not([hidden]) {
-    display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 28px; align-items: start;
+  /* While playing on a wide screen the game fills the window: no scrolling, and the
+     camera frames take whatever height is left (sized with container query units). */
+  .shell:has(#play:not([hidden])) {
+    max-width: none; height: 100dvh; padding: 14px 28px 10px;
+    display: flex; flex-direction: column;
   }
+  .shell:has(#play:not([hidden])) .masthead {
+    margin-bottom: 12px; display: flex; align-items: baseline; gap: 20px;
+  }
+  .shell:has(#play:not([hidden])) h1 { order: 1; font-size: 32px; }
+  .shell:has(#play:not([hidden])) .masthead-top { order: 2; margin-left: auto; gap: 24px; }
+  .shell:has(#play:not([hidden])) .masthead-top > * { margin: 0; }
+  .shell:has(#play:not([hidden])) .foot { margin-top: 8px; }
+
+  #play:not([hidden]) {
+    flex: 1; min-height: 0; padding: 18px 24px;
+    display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 28px;
+  }
+  .play-main { display: flex; flex-direction: column; min-height: 0; }
+  .play-main .quit { margin-bottom: 4px; align-self: flex-start; }
+  .play-main .arena {
+    flex: 1; min-height: 180px; margin: 12px 0 4px; padding: 12px 0;
+    container-type: size; align-content: center;
+  }
+  .arena.live { grid-template-columns: auto auto auto; justify-content: center; column-gap: 20px; }
+  /* Two 4:3 frames side by side: as tall as the arena allows, as wide as the column allows. */
+  .arena.live .slot { height: min(100cqh, calc((100cqw - 120px) * 3 / 8)); }
+  .play-main .verdict { margin: 4px 0 12px; }
+  .play-main .move { padding: 10px 6px; }
+
   .play-side {
-    position: sticky; top: 24px; align-self: stretch;
     border-left: 1px dashed var(--line); padding-left: 24px;
-    display: flex; flex-direction: column; max-height: calc(100vh - 220px);
+    display: flex; flex-direction: column; min-height: 0;
   }
   .play-side .side-title { margin-top: 0; }
   .play-side .history { overflow-y: auto; min-height: 0; }
@@ -354,9 +378,11 @@ legend { padding: 0 6px; color: var(--muted); font-size: 12px; text-transform: u
 
 /* With the camera on, each frame reacts to the result. */
 .arena.live .slot { transition: box-shadow 0.3s, filter 0.4s; }
-.arena.live.outcome-win .slot-left,
-.arena.live.outcome-lose .slot-right {
+.arena.live.outcome-win .slot-left {
   box-shadow: 0 0 0 3px var(--win), 0 0 40px color-mix(in srgb, var(--win) 55%, transparent);
+}
+.arena.live.outcome-lose .slot-right {
+  box-shadow: 0 0 0 3px var(--lose), 0 0 40px color-mix(in srgb, var(--lose) 55%, transparent);
 }
 .arena.live.outcome-lose .slot-left,
 .arena.live.outcome-win .slot-right { filter: grayscale(1) brightness(0.6); }
