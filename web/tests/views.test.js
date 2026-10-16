@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   countdownLabel,
+  matchesLabel,
   matchResultView,
   liveRoomView,
   openRoomView,
@@ -207,5 +208,13 @@ describe("matchResultView", () => {
     assert.equal(view.outcome, "draw");
     assert.equal(view.headline, "Match drawn");
     assert.equal(view.detail, "You 1 · Bo 1 · 1 draw");
+  });
+});
+
+describe("matchesLabel", () => {
+  it("counts with thousands separators", () => {
+    assert.equal(matchesLabel(0), "No matches played yet");
+    assert.equal(matchesLabel(1), "1 match played");
+    assert.equal(matchesLabel(1234), "1,234 matches played");
   });
 });

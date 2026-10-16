@@ -1,19 +1,14 @@
 """RoomService across instances: shared storage, compare-and-set retries, timer takeover."""
 
 import json
+from dataclasses import replace
 
 import pytest
 from conftest import BACKENDS, BackendFactory, run, wait_until
 
 from psr.moves import Move
 from psr.server.engine import Engine, Timing
-from psr.server.memory import (
-    MemoryEventBus,
-    MemoryPresenceBoard,
-    MemoryRoomDirectory,
-    MemoryRoomStore,
-    MemoryTimerQueue,
-)
+from psr.server.memory import MemoryRoomStore, MemoryTimerQueue, memory_backend
 from psr.server.ports import Backend, Envelope
 from psr.server.service import MAX_ATTEMPTS, TIMER_LEASE, ConflictError, RoomService
 from psr.server.state import Join, PlaceMove, ProtocolError, RoomState, Timer
@@ -163,9 +158,7 @@ class RacingStore:
 
 def _racing_backend() -> tuple[Backend, RacingStore]:
     store = RacingStore(Engine(TIMING), Clock())
-    return Backend(
-        store, MemoryEventBus(), MemoryTimerQueue(), MemoryPresenceBoard(), MemoryRoomDirectory()
-    ), store
+    return replace(memory_backend(), store=store), store
 
 
 class AlwaysStaleStore(RacingStore):
@@ -182,7 +175,7 @@ def test_gives_up_under_constant_contention_and_retries_the_timer_later() -> Non
         store = AlwaysStaleStore(Engine(TIMING), clock)
         timers = MemoryTimerQueue()
         service = RoomService(
-            Backend(store, MemoryEventBus(), timers, MemoryPresenceBoard(), MemoryRoomDirectory()),
+            replace(memory_backend(), store=store, timers=timers),
             Engine(TIMING),
             clock,
         )
@@ -203,13 +196,7 @@ def test_gives_up_under_constant_contention_and_retries_the_timer_later() -> Non
 def test_timer_for_a_deleted_room_is_dropped() -> None:
     async def scenario() -> None:
         clock = Clock()
-        backend = Backend(
-            MemoryRoomStore(),
-            MemoryEventBus(),
-            MemoryTimerQueue(),
-            MemoryPresenceBoard(),
-            MemoryRoomDirectory(),
-        )
+        backend = memory_backend()
         service = RoomService(backend, Engine(TIMING), clock)
         await backend.timers.schedule(Timer("GONE", "round", 1, at=clock.now))
         assert await service.fire_due_timers() == 1

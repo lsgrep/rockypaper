@@ -19,6 +19,16 @@ from psr.server.engine import Timing
 FAST = Timing(countdown=0.2, grace=0.0, result_pause=0.05, reconnect_grace=5.0)
 
 
+def online(client: TestClient) -> int:
+    players: int = client.get("/api/stats").json()["players"]
+    return players
+
+
+def matches(client: TestClient) -> dict[str, int]:
+    played: dict[str, int] = client.get("/api/stats").json()["matches"]
+    return played
+
+
 def receive_until(ws: WebSocketTestSession, kind: str, limit: int = 30) -> dict[str, Any]:
     for _ in range(limit):
         message: dict[str, Any] = ws.receive_json()
@@ -225,26 +235,26 @@ def test_online_count_follows_seated_players_across_instances() -> None:
     first = create_app(redis=FakeRedis(server=server), timing=FAST, instance="app-1")
     second = create_app(redis=FakeRedis(server=server), timing=FAST, instance="app-2")
     with TestClient(first) as one, TestClient(second) as two:
-        assert one.get("/api/online").json() == {"players": 0}
+        assert online(one) == 0
         with one.websocket_connect("/ws") as alice, two.websocket_connect("/ws") as bob:
             alice.send_json({"type": "create", "name": "Alice", "rounds": 1})
             code = receive_until(alice, "joined")["room"]
-            assert two.get("/api/online").json() == {"players": 1}
+            assert online(two) == 1
             bob.send_json({"type": "join", "name": "Bob", "room": code})
             receive_until(bob, "joined")
-            assert one.get("/api/online").json() == {"players": 2}
+            assert online(one) == 2
 
             bob.send_json({"type": "leave"})
             receive_until(alice, "notice")
-            assert one.get("/api/online").json() == {"players": 1}
-        assert two.get("/api/online").json() == {"players": 0}
+            assert online(one) == 1
+        assert online(two) == 0
 
 
 def test_failed_join_is_not_counted() -> None:
     with TestClient(create_app(timing=FAST)) as client, client.websocket_connect("/ws") as ws:
         ws.send_json({"type": "join", "name": "Zed", "room": "ZZZZ"})
         receive_until(ws, "error")
-        assert client.get("/api/online").json() == {"players": 0}
+        assert online(client) == 0
 
 
 def test_players_vs_the_computer_are_counted_while_connected() -> None:
@@ -254,8 +264,8 @@ def test_players_vs_the_computer_are_counted_while_connected() -> None:
             solo.send_json({"type": "playing"})  # repeated announcements count once
             solo.send_json({"type": "move", "move": "rock"})  # round-trip so both are handled
             receive_until(solo, "error")
-            assert client.get("/api/online").json() == {"players": 1}
-        assert client.get("/api/online").json() == {"players": 0}
+            assert online(client) == 1
+        assert online(client) == 0
 
 
 def test_a_solo_player_who_joins_a_room_is_counted_once() -> None:
@@ -263,7 +273,7 @@ def test_a_solo_player_who_joins_a_room_is_counted_once() -> None:
         ws.send_json({"type": "playing"})
         ws.send_json({"type": "create", "name": "Alice", "rounds": 1})
         receive_until(ws, "joined")
-        assert client.get("/api/online").json() == {"players": 1}
+        assert online(client) == 1
 
 
 def test_site_files_are_revalidated_but_the_model_is_cached(tmp_path: Path) -> None:
@@ -272,7 +282,7 @@ def test_site_files_are_revalidated_but_the_model_is_cached(tmp_path: Path) -> N
     (tmp_path / "vendor" / "model.task").write_bytes(b"weights")
     with TestClient(create_app(static_dir=tmp_path)) as client:
         assert client.get("/").headers["cache-control"] == "no-cache"
-        assert client.get("/api/online").headers["cache-control"] == "no-cache"
+        assert client.get("/api/stats").headers["cache-control"] == "no-cache"
         assert "max-age=86400" in client.get("/vendor/model.task").headers["cache-control"]
 
 
@@ -326,3 +336,36 @@ def test_private_rooms_are_not_listed() -> None:
         with client.websocket_connect("/ws") as bob:  # still joinable by code
             bob.send_json({"type": "join", "name": "Bob", "room": code})
             assert receive_until(bob, "joined")["seat"] == 1
+
+
+def test_finished_online_matches_are_counted_once_each() -> None:
+    app = create_app(timing=FAST, timer_poll=0.01)
+    with TestClient(app) as client:
+        assert matches(client) == {"online": 0, "computer": 0}
+        with client.websocket_connect("/ws") as alice, client.websocket_connect("/ws") as bob:
+            alice.send_json({"type": "create", "name": "Alice", "rounds": 1})
+            code = receive_until(alice, "joined")["room"]
+            bob.send_json({"type": "join", "name": "Bob", "room": code})
+            for _ in range(2):  # the match, then a rematch
+                receive_until(alice, "round")
+                alice.send_json({"type": "move", "move": "rock"})
+                bob.send_json({"type": "move", "move": "paper"})
+                receive_until(alice, "reveal")
+                alice.send_json({"type": "rematch"})
+                bob.send_json({"type": "rematch"})
+            assert matches(client) == {"online": 2, "computer": 0}
+
+
+def test_matches_against_the_computer_are_reported_once_per_game() -> None:
+    with TestClient(create_app(timing=FAST)) as client:
+        with client.websocket_connect("/ws") as stranger:
+            stranger.send_json({"type": "finished"})  # never said it was playing
+            stranger.send_json({"type": "move", "move": "rock"})
+            receive_until(stranger, "error")
+        with client.websocket_connect("/ws") as solo:
+            solo.send_json({"type": "playing"})
+            solo.send_json({"type": "finished"})
+            solo.send_json({"type": "finished"})  # repeats are ignored
+            solo.send_json({"type": "move", "move": "rock"})
+            receive_until(solo, "error")
+        assert matches(client) == {"online": 0, "computer": 1}

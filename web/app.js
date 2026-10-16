@@ -5,7 +5,7 @@ import { OnlineGame, storedSeat } from "./online.js";
 import { isMuted, play, setMuted, unlockOnFirstGesture } from "./sound.js";
 import { startSolo } from "./solo.js";
 import { $, readRounds, show, toast, wireSteppers } from "./ui.js";
-import { isRoomCode, onlineLabel } from "./views.js";
+import { isRoomCode, matchesLabel, onlineLabel } from "./views.js";
 
 const NAME_KEY = "psr:name";
 const ONLINE_POLL_MS = 10_000;
@@ -107,17 +107,20 @@ function wireOnlineSetup() {
   });
 }
 
-// Header banner: players in online rooms right now. Hidden if the server can't say.
+// Header banner: players online now and matches played so far. Hidden if unavailable.
 async function refreshOnlineCount() {
-  const el = $("online-count");
+  const online = $("online-count");
+  const played = $("matches-count");
   try {
-    const response = await fetch("/api/online", { cache: "no-store" });
+    const response = await fetch("/api/stats", { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const { players } = await response.json();
-    el.textContent = onlineLabel(players);
-    el.hidden = false;
+    const { players, matches } = await response.json();
+    online.textContent = onlineLabel(players);
+    played.textContent = matchesLabel(matches.online + matches.computer);
+    played.title = `${matches.online} online · ${matches.computer} vs the computer`;
+    online.hidden = played.hidden = false;
   } catch {
-    el.hidden = true;
+    online.hidden = played.hidden = true;
   }
 }
 
@@ -153,8 +156,19 @@ function wireSoundToggle() {
   unlockOnFirstGesture();
 }
 
+// The title goes home from anywhere; mid-game it leaves properly first.
+function wireHomeLink() {
+  $("home-link").addEventListener("click", (event) => {
+    event.preventDefault();
+    if (!$("play").hidden) $("quit").click();
+    else if (!$("lobby").hidden) $("lobby-leave").click();
+    goHome();
+  });
+}
+
 function main() {
   wireSoundToggle();
+  wireHomeLink();
   watchOnlineCount();
   wireSteppers();
   wireSoloSetup();

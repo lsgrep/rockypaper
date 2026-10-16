@@ -120,10 +120,11 @@ def create_app(
                 return JSONResponse({"status": "redis unavailable"}, status_code=503)
         return JSONResponse({"status": "ok", "instance": instance})
 
-    @app.get("/api/online")
-    async def online() -> JSONResponse:
-        """Players in a room or playing the computer, summed over all instances."""
-        return JSONResponse({"players": await presence.total()})
+    @app.get("/api/stats")
+    async def stats() -> JSONResponse:
+        """Players online now (in a room or playing the computer) and matches played."""
+        players = await presence.total()
+        return JSONResponse({"players": players, "matches": await service.match_counts()})
 
     @app.get("/api/rooms")
     async def rooms() -> JSONResponse:

@@ -9,6 +9,7 @@ from psr.server.presence import Presence
 from psr.server.protocol import (
     ClientMessage,
     CreateRoom,
+    FinishedVsComputer,
     JoinRoom,
     LeaveRoom,
     Playing,
@@ -42,6 +43,8 @@ class Gateway:
         self._send = send
         self._presence = presence
         self._counted = False
+        self._playing_computer = False
+        self._reported_match = False
         self._room: str | None = None
         self._token: str | None = None
         self._subscription: Subscription | None = None
@@ -74,7 +77,12 @@ class Gateway:
                 await self._service.execute(room, Leave(token))
                 await self._forget()
             case Playing():
+                self._playing_computer = True
                 await self._count()
+            case FinishedVsComputer():
+                if self._playing_computer and not self._reported_match:
+                    self._reported_match = True
+                    await self._service.record_computer_match()
 
     async def close(self) -> None:
         """The socket closed: keep the seat for a while so the player can resume."""

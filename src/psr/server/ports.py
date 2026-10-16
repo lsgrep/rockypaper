@@ -71,6 +71,14 @@ class RoomDirectory(Protocol):
     async def list(self, now: float) -> list[RoomSummary]: ...
 
 
+class StatsCounter(Protocol):
+    """Lifetime totals, e.g. matches played. Kept in durable storage in production."""
+
+    async def increment(self, name: str) -> None: ...
+
+    async def read(self) -> dict[str, int]: ...
+
+
 @dataclass(frozen=True)
 class Backend:
     store: RoomStore
@@ -78,3 +86,4 @@ class Backend:
     timers: TimerQueue
     presence: PresenceBoard
     directory: RoomDirectory
+    stats: StatsCounter

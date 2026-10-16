@@ -4,15 +4,21 @@ export const socketUrl = () =>
   `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
 
 // Versus the computer runs entirely in the browser; this keeps one socket open so the
-// server can count the player as online. Returns a function that ends it.
+// server can count the player as online, and report the match when it ends.
 export function announcePlaying() {
   let socket;
   try {
     socket = new WebSocket(socketUrl());
   } catch {
-    return () => {};
+    return { finished() {}, end() {} };
   }
-  socket.addEventListener("open", () => socket.send(JSON.stringify({ type: "playing" })));
+  const send = (message) => {
+    if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
+  };
+  socket.addEventListener("open", () => send({ type: "playing" }));
   socket.addEventListener("error", () => {}); // being uncounted is fine; the game still works
-  return () => socket.close();
+  return {
+    finished: () => send({ type: "finished" }),
+    end: () => socket.close(),
+  };
 }

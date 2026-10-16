@@ -100,3 +100,10 @@ export function matchResultView(score, opponent) {
     detail: `You ${score.left} · ${opponent} ${score.right} · ${draws}`,
   };
 }
+
+// Header banner text for the lifetime number of matches played.
+export function matchesLabel(total) {
+  if (total === 0) return "No matches played yet";
+  const count = total.toLocaleString("en-US");
+  return total === 1 ? "1 match played" : `${count} matches played`;
+}

@@ -74,6 +74,12 @@ class LeaveRoom(Message):
     type: Literal["leave"] = "leave"
 
 
+class FinishedVsComputer(Message):
+    """A match against the computer ended (counted once per playing connection)."""
+
+    type: Literal["finished"] = "finished"
+
+
 class Playing(Message):
     """This connection is a player outside any room (versus the computer), for the count."""
 
@@ -88,7 +94,8 @@ ClientMessage = Annotated[
     | SendSnapshot
     | RequestRematch
     | LeaveRoom
-    | Playing,
+    | Playing
+    | FinishedVsComputer,
     Field(discriminator="type"),
 ]
 CLIENT_MESSAGE: TypeAdapter[ClientMessage] = TypeAdapter(ClientMessage)

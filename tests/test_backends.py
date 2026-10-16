@@ -137,3 +137,15 @@ def test_directory_lists_newest_first_and_drops_stale_rooms(make_backend: Backen
             assert [r.code for r in await directory.list(now=later)] == ["NEW1"]
 
     run(scenario)
+
+
+def test_stats_counters_add_up(make_backend: BackendFactory) -> None:
+    async def scenario() -> None:
+        async with make_backend() as backend:
+            assert await backend.stats.read() == {}
+            await backend.stats.increment("online")
+            await backend.stats.increment("online")
+            await backend.stats.increment("computer")
+            assert await backend.stats.read() == {"online": 2, "computer": 1}
+
+    run(scenario)

@@ -9,6 +9,7 @@ from collections.abc import Callable
 from psr.server.directory import RoomSummary, summarize
 from psr.server.engine import Engine
 from psr.server.ports import Backend, Envelope
+from psr.server.protocol import RoundRevealed
 from psr.server.state import Command, Fire, Outcome, ProtocolError
 
 log = logging.getLogger(__name__)
@@ -18,6 +19,8 @@ CODE_LENGTH = 4
 MAX_ATTEMPTS = 10
 TIMER_LEASE = 5.0  # a claimed timer comes due again if its instance dies mid-way
 TIMER_BATCH = 100
+ONLINE_MATCHES = "online"
+COMPUTER_MATCHES = "computer"
 
 
 class ConflictError(RuntimeError):
@@ -58,8 +61,17 @@ class RoomService:
             if committed:
                 await self._publish(code, outcome)
                 await self._update_directory(code, outcome)
+                await self._count_finished_match(outcome)
                 return
         raise ConflictError(f"Room {code} is too busy")
+
+    async def record_computer_match(self) -> None:
+        """A match against the computer finished (it runs in the browser)."""
+        await self._backend.stats.increment(COMPUTER_MATCHES)
+
+    async def match_counts(self) -> dict[str, int]:
+        counts = await self._backend.stats.read()
+        return {name: counts.get(name, 0) for name in (ONLINE_MATCHES, COMPUTER_MATCHES)}
 
     async def list_rooms(self) -> list[RoomSummary]:
         return await self._backend.directory.list(self._clock())
@@ -78,6 +90,11 @@ class RoomService:
                 continue  # leave it leased so it comes due again
             await timers.complete(timer)
         return len(due)
+
+    async def _count_finished_match(self, outcome: Outcome) -> None:
+        # Counted after the commit, so each match is counted exactly once.
+        if any(isinstance(e.message, RoundRevealed) and e.message.is_over for e in outcome.events):
+            await self._backend.stats.increment(ONLINE_MATCHES)
 
     async def _update_directory(self, code: str, outcome: Outcome) -> None:
         directory = self._backend.directory

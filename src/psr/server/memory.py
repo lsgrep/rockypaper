@@ -116,6 +116,17 @@ class MemoryRoomDirectory:
         return sorted(self._rooms.values(), key=lambda s: s.updated_at, reverse=True)
 
 
+class MemoryStatsCounter:
+    def __init__(self) -> None:
+        self._counts: dict[str, int] = {}
+
+    async def increment(self, name: str) -> None:
+        self._counts[name] = self._counts.get(name, 0) + 1
+
+    async def read(self) -> dict[str, int]:
+        return dict(self._counts)
+
+
 def memory_backend() -> Backend:
     return Backend(
         MemoryRoomStore(),
@@ -123,4 +134,5 @@ def memory_backend() -> Backend:
         MemoryTimerQueue(),
         MemoryPresenceBoard(),
         MemoryRoomDirectory(),
+        MemoryStatsCounter(),
     )

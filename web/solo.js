@@ -57,11 +57,11 @@ export async function startSolo(rounds, { onExit, onReplay }) {
   const session = webModule.WebSession(rounds);
   const input = new ThrowInput();
   const stopped = new AbortController();
-  const endPresence = announcePlaying();
+  const presence = announcePlaying();
   const finish = (next) => () => {
     if (!stopped.signal.aborted) {
       stopped.abort();
-      endPresence();
+      presence.end();
       handCam.stop();
       session.destroy();
     }
@@ -75,12 +75,16 @@ export async function startSolo(rounds, { onExit, onReplay }) {
   $("quit").onclick = finish(onExit);
   show("play");
   handCam.open();
-  playRounds(session, input, stopped.signal, { onExit: finish(onExit), onReplay: finish(onReplay) });
+  playRounds(session, input, stopped.signal, {
+    onExit: finish(onExit),
+    onReplay: finish(onReplay),
+    onFinished: presence.finished,
+  });
 }
 
 // Each round: the computer commits (hidden) first, then a countdown during which your
 // move follows the camera or your taps. At zero your current move is played.
-async function playRounds(session, input, signal, { onExit, onReplay }) {
+async function playRounds(session, input, signal, { onExit, onReplay, onFinished }) {
   while (!signal.aborted) {
     const move = await throwRound(session, input, signal);
     if (signal.aborted) return;
@@ -97,6 +101,7 @@ async function playRounds(session, input, signal, { onExit, onReplay }) {
     const view = soloRevealView(result, photo);
     renderReveal(view);
     if (result.is_over) {
+      onFinished();
       const actions = { againLabel: "Play again", onAgain: onReplay, onLeave: onExit };
       showFinal(matchResultView(view.score, "Computer"), actions);
       return;

@@ -19,7 +19,10 @@ services:
 
   redis:
     image: redis:7.4-alpine
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    # Append-only file on a volume: lifetime stats (matches played) survive restarts.
+    command: ["redis-server", "--save", "", "--appendonly", "yes", "--appendfsync", "everysec"]
+    volumes:
+      - redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -42,3 +45,6 @@ services:
       traefik.http.services.psr.loadbalancer.server.port: "8000"
       traefik.http.services.psr.loadbalancer.healthcheck.path: /healthz
       traefik.http.services.psr.loadbalancer.healthcheck.interval: 5s
+
+volumes:
+  redis-data:

@@ -4,6 +4,7 @@
 - Events: one pattern subscription per instance; handlers filter by room.
 - Presence: one expiring counter key per instance, summed on read.
 - Directory: one hash of public room summaries; stale entries are pruned on read.
+- Stats: one hash of lifetime counters (HINCRBY), durable when Redis persists.
 - Timers: a sorted set scored by due time; claiming re-scores a timer to now + lease
   in one Lua call, so exactly one instance runs it, and it reappears if that one dies.
 """
@@ -28,6 +29,7 @@ EVENTS_PREFIX = "psr:events:"
 TIMERS_KEY = "psr:timers"
 PRESENCE_PREFIX = "psr:online:"
 DIRECTORY_KEY = "psr:rooms"
+STATS_KEY = "psr:stats"
 ROOM_TTL_SECONDS = 6 * 60 * 60  # idle rooms disappear on their own
 
 SAVE_IF_VERSION = """
@@ -211,6 +213,18 @@ class RedisRoomDirectory:
         return sorted(fresh, key=lambda r: r.updated_at, reverse=True)
 
 
+class RedisStatsCounter:
+    def __init__(self, redis: Redis) -> None:
+        self._redis = redis
+
+    async def increment(self, name: str) -> None:
+        await self._redis.hincrby(STATS_KEY, name, 1)
+
+    async def read(self) -> dict[str, int]:
+        raw = await self._redis.hgetall(STATS_KEY)
+        return {_text(key): int(value) for key, value in raw.items()}
+
+
 def _encode(timer: Timer) -> str:
     return json.dumps([timer.room, timer.name, timer.token, timer.at])
 
@@ -232,5 +246,6 @@ def redis_backend(redis: Redis) -> tuple[Backend, RedisEventBus]:
         RedisTimerQueue(redis),
         RedisPresenceBoard(redis),
         RedisRoomDirectory(redis),
+        RedisStatsCounter(redis),
     )
     return backend, bus
