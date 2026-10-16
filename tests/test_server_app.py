@@ -193,3 +193,28 @@ def test_timer_loop_survives_errors() -> None:
     with pytest.raises(asyncio.CancelledError):
         asyncio.run(run_timers(service, poll=0.001))  # type: ignore[arg-type]
     assert service.calls == 3
+
+
+def test_reveal_carries_both_players_photos() -> None:
+    app = create_app(timing=FAST, timer_poll=0.01)
+    photo = "data:image/jpeg;base64,/9j/4AAQ"
+    with players(app, app) as (alice, bob):
+        alice.send_json({"type": "create", "name": "Alice", "rounds": 1})
+        code = receive_until(alice, "joined")["room"]
+        bob.send_json({"type": "join", "name": "Bob", "room": code})
+        receive_until(alice, "round")
+        alice.send_json({"type": "move", "move": "rock"})
+        alice.send_json({"type": "snapshot", "image": photo})
+        bob.send_json({"type": "move", "move": "rock"})
+        assert receive_until(bob, "reveal")["snapshots"] == [photo, None]
+
+
+def test_snapshots_must_be_small_jpeg_data_urls() -> None:
+    with TestClient(create_app(timing=FAST)) as client, client.websocket_connect("/ws") as ws:
+        for image in (
+            "data:image/png;base64,AAAA",
+            "javascript:alert(1)",
+            "data:image/jpeg;base64," + "A" * 200_000,
+        ):
+            ws.send_json({"type": "snapshot", "image": image})
+            assert receive_until(ws, "error")["message"] == "Invalid message"

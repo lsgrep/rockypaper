@@ -35,6 +35,15 @@ export function setHand(side, text) {
   hand.classList.toggle("concealed", text === CONCEALED);
 }
 
+// A frozen camera frame shown in a hand's slot (null clears it).
+export function setPhoto(side, src) {
+  const img = $(`photo-${side}`);
+  img.hidden = !src;
+  if (src) img.src = src;
+  else img.removeAttribute("src");
+  img.closest(".slot").classList.toggle("has-photo", Boolean(src));
+}
+
 export function setBadge(side, text) {
   const badge = $(`badge-${side}`);
   badge.textContent = text;
@@ -100,6 +109,8 @@ export function setScore({ left, right, draws }) {
 // view: { round, rounds, leftMove, rightMove, outcome, headline, rule, score, rightName }
 export function renderReveal(view) {
   $("countdown").hidden = true;
+  setPhoto("left", view.leftPhoto ?? null);
+  setPhoto("right", view.rightPhoto ?? null);
   setHand("left", GLYPHS[view.leftMove]);
   setHand("right", GLYPHS[view.rightMove]);
   setBadge("left", "");
@@ -122,14 +133,21 @@ const CONFETTI_MS = 1400;
 // Win: winner leaps, loser droops, confetti. Lose: the reverse plus a shake. Draw: hands clash.
 function playOutcome(outcome) {
   const arena = $("arena");
-  clearOutcome();
+  removeOutcomeClasses();
   void arena.offsetWidth; // restart the animations
   arena.classList.add(`outcome-${outcome}`);
   if (outcome === "win") burstConfetti(arena);
 }
 
-export function clearOutcome() {
+function removeOutcomeClasses() {
   $("arena").classList.remove(...OUTCOMES.map((o) => `outcome-${o}`));
+}
+
+// Back to a fresh round: no result animation, live camera instead of frozen photos.
+export function clearOutcome() {
+  removeOutcomeClasses();
+  setPhoto("left", null);
+  setPhoto("right", null);
 }
 
 function burstConfetti(arena) {

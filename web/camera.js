@@ -7,6 +7,8 @@ import { MoveStreak, readResult } from "./gesture.js";
 const VENDOR = new URL("./vendor/mediapipe/", import.meta.url).href;
 const MODEL_URL = `${VENDOR}gesture_recognizer.task`;
 const HAND_COLOR = "#ff6a4d";
+const SNAPSHOT_WIDTH = 320;
+const SNAPSHOT_QUALITY = 0.7;
 async function loadVision() {
   const vision = await import(`${VENDOR}vision_bundle.mjs`);
   const fileset = await vision.FilesetResolver.forVisionTasks(`${VENDOR}wasm`);
@@ -85,6 +87,20 @@ export class GestureCamera {
       signal?.addEventListener("abort", () => finish(null), { once: true });
       this.#waiters.add(waiter);
     });
+  }
+
+  // The current frame as a small mirrored JPEG data URL (what the player sees), or null.
+  snapshot() {
+    const video = this.#video;
+    if (video.readyState < 2 || !video.videoWidth) return null;
+    const canvas = document.createElement("canvas");
+    canvas.width = SNAPSHOT_WIDTH;
+    canvas.height = Math.round((SNAPSHOT_WIDTH * video.videoHeight) / video.videoWidth);
+    const ctx = canvas.getContext("2d");
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", SNAPSHOT_QUALITY);
   }
 
   stop() {

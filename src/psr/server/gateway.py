@@ -12,6 +12,7 @@ from psr.server.protocol import (
     LeaveRoom,
     RequestRematch,
     ResumeSeat,
+    SendSnapshot,
     SetMove,
 )
 from psr.server.service import RoomService
@@ -22,6 +23,7 @@ from psr.server.state import (
     Join,
     Leave,
     PlaceMove,
+    PlaceSnapshot,
     ProtocolError,
     Resume,
 )
@@ -55,6 +57,9 @@ class Gateway:
             case SetMove(move=move):
                 room, token = self._seated()
                 await self._service.execute(room, PlaceMove(token, move))
+            case SendSnapshot(image=image):
+                room, token = self._seated()
+                await self._service.execute(room, PlaceSnapshot(token, image))
             case RequestRematch():
                 room, token = self._seated()
                 await self._service.execute(room, AskRematch(token))

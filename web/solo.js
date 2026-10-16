@@ -81,6 +81,7 @@ async function playRounds(session, input, signal, { onExit, onReplay }) {
   while (!signal.aborted) {
     const move = await throwRound(session, input, signal);
     if (signal.aborted) return;
+    const photo = move ? handCam.snapshot() : null; // your frame at zero
     if (!move) {
       setVerdict("No move in time", "Replaying the round. The computer keeps its move.");
       await sleep(REPLAY_MS, signal);
@@ -90,7 +91,7 @@ async function playRounds(session, input, signal, { onExit, onReplay }) {
     const proxy = session.play(move);
     const result = proxy.toJs({ dict_converter: Object.fromEntries });
     proxy.destroy();
-    renderReveal(soloRevealView(result));
+    renderReveal(soloRevealView(result, photo));
     if (result.is_over) {
       showFinal(result.summary, { againLabel: "Play again", onAgain: onReplay, onLeave: onExit });
       return;

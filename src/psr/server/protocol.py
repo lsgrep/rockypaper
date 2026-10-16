@@ -1,7 +1,8 @@
 """Messages exchanged over the WebSocket, validated with Pydantic.
 
 The server never tells a client the opponent's move before the round's deadline:
-`PlayerReady` only says *that* a seat has a move, `RoundRevealed` carries both.
+`PlayerReady` only says *that* a seat has a move, `RoundRevealed` carries both
+moves and both camera snapshots.
 """
 
 from typing import Annotated, Literal
@@ -15,6 +16,11 @@ RoomCode = Annotated[
     str, StringConstraints(strip_whitespace=True, to_upper=True, pattern=r"^[A-Za-z0-9]{4}$")
 ]
 SeatToken = Annotated[str, StringConstraints(min_length=16, max_length=64)]
+# A small JPEG frame from the player's camera, as a data URL (~20 KB at 320x240).
+SnapshotImage = Annotated[
+    str,
+    StringConstraints(max_length=100_000, pattern=r"^data:image/jpeg;base64,[A-Za-z0-9+/]+=*$"),
+]
 MAX_ROUNDS = 99
 
 
@@ -52,6 +58,13 @@ class SetMove(Message):
     move: Move
 
 
+class SendSnapshot(Message):
+    """The player's camera frame at zero; revealed to both players with the moves."""
+
+    type: Literal["snapshot"] = "snapshot"
+    image: SnapshotImage
+
+
 class RequestRematch(Message):
     type: Literal["rematch"] = "rematch"
 
@@ -61,7 +74,7 @@ class LeaveRoom(Message):
 
 
 ClientMessage = Annotated[
-    CreateRoom | JoinRoom | ResumeSeat | SetMove | RequestRematch | LeaveRoom,
+    CreateRoom | JoinRoom | ResumeSeat | SetMove | SendSnapshot | RequestRematch | LeaveRoom,
     Field(discriminator="type"),
 ]
 CLIENT_MESSAGE: TypeAdapter[ClientMessage] = TypeAdapter(ClientMessage)
@@ -106,6 +119,7 @@ class RoundRevealed(Message):
     round: int
     rounds: int
     moves: list[Move]
+    snapshots: list[str | None]
     winner: int | None
     rule: str | None
     score: Score

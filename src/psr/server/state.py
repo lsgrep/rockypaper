@@ -24,6 +24,7 @@ class SeatState(BaseModel):
     token: str
     name: str
     move: Move | None = None
+    snapshot: str | None = None
     wants_rematch: bool = False
     connected: bool = True
 
@@ -69,6 +70,12 @@ class PlaceMove:
 
 
 @dataclass(frozen=True)
+class PlaceSnapshot:
+    token: str
+    image: str
+
+
+@dataclass(frozen=True)
 class AskRematch:
     token: str
 
@@ -91,7 +98,7 @@ class Fire:
     token: int
 
 
-Command = Join | Resume | PlaceMove | AskRematch | Leave | Disconnect | Fire
+Command = Join | Resume | PlaceMove | PlaceSnapshot | AskRematch | Leave | Disconnect | Fire
 
 
 # --- outcome ----------------------------------------------------------------

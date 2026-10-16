@@ -36,6 +36,7 @@ from psr.server.state import (
     Outcome,
     Phase,
     PlaceMove,
+    PlaceSnapshot,
     ProtocolError,
     Resume,
     RoomState,
@@ -52,7 +53,7 @@ EVICT_PREFIX = "evict:"
 @dataclass(frozen=True)
 class Timing:
     countdown: float = 5.0  # players show their hand; the latest move counts
-    grace: float = 0.5  # extra time for moves still in flight
+    grace: float = 1.0  # extra time for moves and the snapshot taken at zero
     result_pause: float = 3.0  # reveal stays up before the next round
     reconnect_grace: float = 20.0  # a dropped player keeps their seat this long
     max_replays: int = 2  # replays of a round someone missed before giving up
@@ -95,6 +96,9 @@ class _Turn:
                 self._resume(token)
             case PlaceMove(token=token, move=move):
                 self._place_move(self._seat(token), move)
+            case PlaceSnapshot(token=token, image=image):
+                self._require_open_round()
+                self._seat(token).snapshot = image
             case AskRematch(token=token):
                 self._ask_rematch(self._seat(token))
             case Leave(token=token):
@@ -126,10 +130,13 @@ class _Turn:
             self._send(seat, self._sync(seat))
         self._broadcast_others(seat, Notice(text=f"{seat.name} reconnected."))
 
-    def _place_move(self, seat: SeatState, move: Move) -> None:
+    def _require_open_round(self) -> None:
         deadline = self.state.deadline
         if self.state.phase is not Phase.THROWING or deadline is None or self._now > deadline:
             raise ProtocolError("There is no round to play right now")
+
+    def _place_move(self, seat: SeatState, move: Move) -> None:
+        self._require_open_round()
         first = seat.move is None
         seat.move = move
         if first:
@@ -184,6 +191,7 @@ class _Turn:
         state = self.state
         for seat in state.seats:
             seat.move = None
+            seat.snapshot = None
         state.phase = Phase.THROWING
         state.deadline = self._now + self._timing.countdown + self._timing.grace
         self._schedule(ROUND_TIMER, state.deadline)
@@ -225,6 +233,7 @@ class _Turn:
                 round=result.number,
                 rounds=match.rounds,
                 moves=[first.move, second.move],
+                snapshots=[first.snapshot, second.snapshot],
                 winner=None if result.winner is None else players.index(result.winner),
                 rule=None if result.rule is None else result.rule.describe(),
                 score=self._score(match, players),
@@ -248,6 +257,7 @@ class _Turn:
         state.timers.pop(ROUND_TIMER, None)
         for seat in state.seats:
             seat.move = None
+            seat.snapshot = None
             seat.wants_rematch = False
 
     # --- the core game, rebuilt from history ------------------------------------

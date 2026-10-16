@@ -25,6 +25,7 @@ from psr.server.state import (
     Outcome,
     Phase,
     PlaceMove,
+    PlaceSnapshot,
     ProtocolError,
     Resume,
     RoomState,
@@ -240,3 +241,42 @@ def test_apply_does_not_mutate_the_input_state() -> None:
     original = table.state.model_dump()
     table.engine.apply(table.state, PlaceMove(A, Move.ROCK), table.now)
     assert table.state.model_dump() == original
+
+
+PHOTO_A = "data:image/jpeg;base64,QUFB"
+PHOTO_B = "data:image/jpeg;base64,QkJC"
+
+
+def test_snapshots_stay_hidden_until_the_reveal() -> None:
+    table = Table(rounds=2).seated()
+    table.do(PlaceMove(A, Move.ROCK))
+    table.do(PlaceSnapshot(A, PHOTO_A))
+    table.do(PlaceMove(B, Move.PAPER))
+    table.do(PlaceSnapshot(B, PHOTO_B))
+    assert all("base64" not in m.model_dump_json() for _, m in table.sent)
+
+    table.advance(5.5)
+    (reveal,) = table.of_type(RoundRevealed)
+    assert reveal.snapshots == [PHOTO_A, PHOTO_B]
+
+
+def test_missing_snapshot_reveals_as_none_and_resets_next_round() -> None:
+    table = Table(rounds=2).seated()
+    table.do(PlaceMove(A, Move.ROCK))
+    table.do(PlaceSnapshot(A, PHOTO_A))
+    table.do(PlaceMove(B, Move.ROCK))
+    table.advance(5.5)
+    assert table.of_type(RoundRevealed)[0].snapshots == [PHOTO_A, None]
+
+    table.advance(3.0)  # next round starts
+    table.do(PlaceMove(A, Move.PAPER))
+    table.do(PlaceMove(B, Move.ROCK))
+    table.advance(5.5)
+    assert table.of_type(RoundRevealed)[1].snapshots == [None, None]
+
+
+def test_snapshot_after_the_deadline_is_rejected() -> None:
+    table = Table().seated()
+    table.now += 5.6
+    with pytest.raises(ProtocolError, match="no round"):
+        table.do(PlaceSnapshot(A, PHOTO_A))

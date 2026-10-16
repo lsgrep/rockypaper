@@ -43,6 +43,10 @@ class HandCam {
     return () => this.#watchers.delete(fn);
   }
 
+  snapshot() {
+    return this.#camera?.snapshot() ?? null;
+  }
+
   readThrow({ timeoutMs, signal }) {
     if (!this.#camera) return Promise.resolve(null);
     return this.#camera.waitForStableMove({ holdMs: HOLD_MS, timeoutMs, signal });

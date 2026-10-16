@@ -17,6 +17,7 @@ const reveal = {
   round: 2,
   rounds: 3,
   moves: ["paper", "rock"],
+  snapshots: ["data:alice", null],
   winner: 0,
   rule: "Paper wraps Rock",
   score: { wins: [2, 0], draws: 1 },
@@ -43,7 +44,22 @@ describe("onlineRevealView", () => {
       headline: "You win the round",
       rule: "Paper wraps Rock",
       score: { left: 2, right: 0, draws: 1 },
+      leftPhoto: "data:alice",
+      rightPhoto: null,
     });
+  });
+
+  it("shows the opponent's photo on the right for seat 1", () => {
+    const view = onlineRevealView(reveal, 1, "Alice");
+    assert.equal(view.leftPhoto, null);
+    assert.equal(view.rightPhoto, "data:alice");
+  });
+
+  it("tolerates reveals without snapshots", () => {
+    const { snapshots, ...older } = reveal;
+    const view = onlineRevealView(older, 0, "Bob");
+    assert.equal(view.leftPhoto, null);
+    assert.equal(view.rightPhoto, null);
   });
 
   it("mirrors moves and score for seat 1", () => {
@@ -82,6 +98,17 @@ describe("soloRevealView", () => {
     assert.equal(view.headline, "You win the round");
     assert.equal(view.leftMove, "rock");
     assert.deepEqual(view.score, { left: 1, right: 0, draws: 0 });
+    assert.equal(view.leftPhoto, null);
+  });
+
+  it("freezes your photo on the left; the computer has none", () => {
+    const view = soloRevealView(
+      { round: 1, rounds: 1, human_move: "rock", computer_move: "rock", outcome: "draw",
+        rule: null, score: { human: 0, computer: 0, draws: 1 } },
+      "data:me",
+    );
+    assert.equal(view.leftPhoto, "data:me");
+    assert.equal(view.rightPhoto, null);
   });
 
   it("names the computer when it wins", () => {

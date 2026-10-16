@@ -235,13 +235,14 @@ legend { padding: 0 6px; color: var(--muted); font-size: 12px; text-transform: u
 .arena.pumping .hand.concealed { animation-name: shake; }
 .arena.pumping .vs { opacity: 0; }
 
-/* --- live camera: the left slot becomes the camera feed with the tracked hand --- */
+/* --- live camera: both slots become matching frames; yours shows the feed --- */
 .slot video, .slot canvas { display: none; }
-.arena.live { grid-template-columns: 1.7fr auto 1fr; }
-.arena.live .slot:first-child {
+.arena.live { grid-template-columns: 1fr auto 1fr; }
+.arena.live .slot {
   aspect-ratio: 4 / 3; overflow: hidden; border-radius: 14px;
   border: 1px solid var(--line); background: #000;
 }
+.arena.live .slot-right { background: var(--bg); }
 .arena.live .slot video, .arena.live .slot canvas {
   display: block; position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: cover; transform: scaleX(-1);
@@ -251,6 +252,21 @@ legend { padding: 0 6px; color: var(--muted); font-size: 12px; text-transform: u
   font-size: 34px; line-height: 1.2; border-radius: 12px;
   background: color-mix(in srgb, var(--bg) 70%, transparent); animation: none;
 }
+
+/* --- the reveal: each slot freezes on that player's photo at zero ------------------ */
+.slot .photo {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1;
+  animation: photo-in 0.35s ease-out;
+}
+.slot.has-photo { aspect-ratio: 4 / 3; overflow: hidden; border-radius: 14px; }
+.slot.has-photo .hand {
+  position: absolute; left: 8px; bottom: 8px; z-index: 2; padding: 2px 8px;
+  font-size: 34px; line-height: 1.2; border-radius: 12px;
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+}
+.slot.has-photo .hand.mirrored { left: auto; right: 8px; }
+.slot.has-photo .badge { z-index: 2; }
+@keyframes photo-in { from { opacity: 0; scale: 1.06; } }
 .camera-status { font-size: 13px; color: var(--ink); }
 
 /* --- 5-second live throw: the count sits in the middle column, the feed stays clear --- */
@@ -336,10 +352,12 @@ legend { padding: 0 6px; color: var(--muted); font-size: 12px; text-transform: u
   .arena[class*="outcome-"], .arena[class*="outcome-"] .hand, .verdict b { animation: none !important; }
 }
 
-/* With the camera on, the feed itself reacts to the result. */
-.arena.live .slot:first-child { transition: box-shadow 0.3s, filter 0.4s; }
-.arena.live.outcome-win .slot:first-child {
+/* With the camera on, each frame reacts to the result. */
+.arena.live .slot { transition: box-shadow 0.3s, filter 0.4s; }
+.arena.live.outcome-win .slot-left,
+.arena.live.outcome-lose .slot-right {
   box-shadow: 0 0 0 3px var(--win), 0 0 40px color-mix(in srgb, var(--win) 55%, transparent);
 }
-.arena.live.outcome-lose .slot:first-child { filter: grayscale(1) brightness(0.6); }
-.arena.live.outcome-draw .slot:first-child { box-shadow: 0 0 0 3px var(--draw); }
+.arena.live.outcome-lose .slot-left,
+.arena.live.outcome-win .slot-right { filter: grayscale(1) brightness(0.6); }
+.arena.live.outcome-draw .slot { box-shadow: 0 0 0 3px var(--draw); }

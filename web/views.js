@@ -30,13 +30,15 @@ export function onlineRevealView(message, seat, opponent) {
     headline: headlines[outcome],
     rule: message.rule,
     score: scoreForSeat(message.score, seat),
+    leftPhoto: message.snapshots?.[seat] ?? null,
+    rightPhoto: message.snapshots?.[1 - seat] ?? null,
   };
 }
 
 const SOLO_HEADLINES = { win: "You win the round", lose: "Computer wins the round", draw: "Draw" };
 
-// psr.web.WebSession.play() result -> board view.
-export function soloRevealView(result) {
+// psr.web.WebSession.play() result -> board view; `photo` is your frame at zero, if any.
+export function soloRevealView(result, photo = null) {
   return {
     round: result.round,
     rounds: result.rounds,
@@ -46,6 +48,8 @@ export function soloRevealView(result) {
     headline: SOLO_HEADLINES[result.outcome],
     rule: result.rule,
     score: { left: result.score.human, right: result.score.computer, draws: result.score.draws },
+    leftPhoto: photo,
+    rightPhoto: null,
   };
 }
 

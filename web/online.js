@@ -141,7 +141,10 @@ export class OnlineGame {
     setHand("right", CONCEALED);
     setBadge("left", yourMove ? "✓" : "");
     setBadge("right", "");
-    setVerdict(replay ? "Replay!" : "Show your hand", "Your move updates live until 0.");
+    setVerdict(
+      replay ? "Replay!" : "Show your hand",
+      `Your move updates live until 0. A photo taken at 0 is shown to ${this.#opponent}.`,
+    );
 
     const move = await this.#input.live({
       countdownMs,
@@ -152,6 +155,8 @@ export class OnlineGame {
       },
     });
     if (abort.signal.aborted) return;
+    const image = move ? handCam.snapshot() : null;
+    if (image) this.#send({ type: "snapshot", image });
     setVerdict(move ? "Time!" : "No move shown", `Waiting for ${this.#opponent}…`);
   }
 

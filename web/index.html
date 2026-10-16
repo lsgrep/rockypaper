@@ -104,14 +104,16 @@
         </div>
 
         <div class="arena" id="arena">
-          <div class="slot">
+          <div class="slot slot-left">
             <video id="camera" playsinline muted></video>
             <canvas id="camera-overlay" aria-hidden="true"></canvas>
+            <img id="photo-left" class="photo" alt="You at zero" hidden>
             <div class="hand" id="hand-left" aria-label="Your move">✊</div>
             <span class="badge" id="badge-left" hidden></span>
           </div>
           <div class="vs">vs</div>
-          <div class="slot">
+          <div class="slot slot-right">
+            <img id="photo-right" class="photo" alt="Opponent at zero" hidden>
             <div class="hand mirrored" id="hand-right" aria-label="Opponent's move">✊</div>
             <span class="badge" id="badge-right" hidden></span>
           </div>

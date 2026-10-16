@@ -28,8 +28,8 @@ WebSocket upgrades to `/ws`). Browsers only allow the camera on `https://` or
 ## Testing
 
 ```sh
-uv run pytest                               # Python: 94 tests (+6 need real Redis), ~3 s
-node --test web/tests/*.test.js             # browser logic: 27 tests, no dependencies
+uv run pytest                               # Python: 99 tests (+6 need real Redis), ~3 s
+node --test web/tests/*.test.js             # browser logic: 30 tests, no dependencies
 uv run ruff check . && uv run ruff format --check . && uv run mypy   # lint + strict types
 
 uv run pytest --cov=psr --cov=scripts --cov-report=term-missing     # 97% line coverage
@@ -53,7 +53,7 @@ I/O-bound parts take their dependencies as arguments:
 |---|---|
 | `test_rules.py`, `test_game.py`, `test_presentation.py` | Rule table validation, rounds, scoring, choosers (incl. the computer committing first), text |
 | `test_cli.py`, `test_web.py` | Console game end to end with fake I/O; the Pyodide session adapter |
-| `test_engine.py` | Every room rule: hidden moves, latest move counts, deadline and grace, replay/abandon, rematch, leave, disconnect/resume, stale timers |
+| `test_engine.py` | Every room rule: hidden moves and photos, latest move counts, deadline and grace, replay/abandon, rematch, leave, disconnect/resume, stale timers |
 | `test_backends.py` | Store compare-and-set, pub/sub routing, timer leases, for memory, fakeredis and (optionally) Redis |
 | `test_service.py` | Two instances sharing a room, timer takeover after a crash, retry on conflict, giving up under contention |
 | `test_server_app.py` | Real WebSockets: full match, a match split across two instances, resume, leave, rematch, errors, health checks |
@@ -68,7 +68,7 @@ Chrome with a fake camera fed a hand photo (`--use-file-for-fake-video-capture`)
 Each round the computer commits its move first (`CommittedChooser`), before
 yours exists, and the page only shows 🔒. A 5-second countdown follows, during
 which your move tracks the camera live (or your latest tap). Whatever is showing
-at zero is played, and the computer's move is revealed. If nothing was read the
+at zero is played, your camera frame freezes, and the computer's move is revealed. If nothing was read the
 round replays and the computer keeps its committed move.
 
 ## Online match
@@ -77,10 +77,18 @@ round replays and the computer keeps its committed move.
 2. Each round the server starts a 5-second countdown. Both players see their own
    camera; each browser streams its current move whenever the reading changes.
 3. The server only tells the opponent *that* a move exists (✓), never which.
-4. At the server's deadline (countdown + 0.5 s grace) it takes each player's latest
-   move, judges the round with the core `Match`, and sends both moves at once.
+4. At zero each browser grabs one camera frame (320 px JPEG, mirrored like the
+   preview) and sends it with the final move.
+5. At the server's deadline (countdown + 1 s grace) it takes each player's latest
+   move, judges the round with the core `Match`, and sends both moves and both
+   photos at once, so each player sees the other as they were at zero.
    Late moves are rejected; if someone showed nothing the round replays (twice max).
-5. A dropped player keeps their seat for 20 s and the client resumes automatically.
+6. A dropped player keeps their seat for 20 s and the client resumes automatically.
+
+Photos only ever go to the opponent in the same room. The server keeps them in
+the room's state until the next round starts and stores them nowhere else; the
+on-screen prompt says a photo is taken at zero. Without a camera the reveal just
+shows the move.
 
 ## Scaling
 
