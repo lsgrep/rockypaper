@@ -27,6 +27,7 @@ from psr.server.engine import Engine, Timing
 from psr.server.gateway import Gateway
 from psr.server.memory import memory_backend
 from psr.server.ports import Backend
+from psr.server.presence import Presence
 from psr.server.protocol import CLIENT_MESSAGE, ErrorMessage
 from psr.server.redis_backend import RedisEventBus, redis_backend
 from psr.server.service import ConflictError, RoomService
@@ -48,6 +49,15 @@ async def run_timers(service: RoomService, poll: float) -> None:
             await asyncio.sleep(poll)
 
 
+async def keep_presence_fresh(presence: Presence) -> None:
+    while True:
+        try:
+            await presence.refresh()
+        except Exception:
+            log.exception("Presence refresh failed; retrying")
+        await asyncio.sleep(presence.ttl / 3)
+
+
 async def send_error(websocket: WebSocket, text: str) -> None:
     await websocket.send_text(ErrorMessage(message=text).model_dump_json())
 
@@ -60,6 +70,7 @@ def create_app(
     static_dir: Path | None = None,
     clock: Callable[[], float] = time.time,
     timer_poll: float = TIMER_POLL_SECONDS,
+    instance: str = INSTANCE,
 ) -> FastAPI:
     """Pass `redis` for a shared multi-instance backend, `backend` to inject one, or neither."""
     redis_bus: RedisEventBus | None = None
@@ -67,18 +78,24 @@ def create_app(
         backend, redis_bus = redis_backend(redis)
     backend = backend or memory_backend()
     service = RoomService(backend, Engine(timing), clock)
+    presence = Presence(backend.presence, instance)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         if redis_bus is not None:
             await redis_bus.start()
-        timers = asyncio.create_task(run_timers(service, timer_poll))
+        tasks = [
+            asyncio.create_task(run_timers(service, timer_poll)),
+            asyncio.create_task(keep_presence_fresh(presence)),
+        ]
         try:
             yield
         finally:
-            timers.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await timers
+            for task in tasks:
+                task.cancel()
+            for task in tasks:
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
             if redis_bus is not None:
                 await redis_bus.stop()
 
@@ -91,12 +108,17 @@ def create_app(
                 await redis.ping()
             except Exception:
                 return JSONResponse({"status": "redis unavailable"}, status_code=503)
-        return JSONResponse({"status": "ok", "instance": INSTANCE})
+        return JSONResponse({"status": "ok", "instance": instance})
+
+    @app.get("/api/online")
+    async def online() -> JSONResponse:
+        """Players currently connected to a room, summed over all instances."""
+        return JSONResponse({"players": await presence.total()})
 
     @app.websocket("/ws")
     async def play(websocket: WebSocket) -> None:
         await websocket.accept()
-        gateway = Gateway(service, backend.bus, websocket.send_text)
+        gateway = Gateway(service, backend.bus, websocket.send_text, presence)
         try:
             while True:
                 raw = await websocket.receive_text()

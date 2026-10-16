@@ -5,6 +5,7 @@ import secrets
 from collections.abc import Awaitable, Callable
 
 from psr.server.ports import Envelope, EventBus, Subscription
+from psr.server.presence import Presence
 from psr.server.protocol import (
     ClientMessage,
     CreateRoom,
@@ -32,10 +33,14 @@ Send = Callable[[str], Awaitable[None]]
 
 
 class Gateway:
-    def __init__(self, service: RoomService, bus: EventBus, send: Send) -> None:
+    def __init__(
+        self, service: RoomService, bus: EventBus, send: Send, presence: Presence | None = None
+    ) -> None:
         self._service = service
         self._bus = bus
         self._send = send
+        self._presence = presence
+        self._counted = False
         self._room: str | None = None
         self._token: str | None = None
         self._subscription: Subscription | None = None
@@ -84,12 +89,18 @@ class Gateway:
         except Exception:
             await self._forget()
             raise
+        if self._presence is not None:
+            self._counted = True
+            await self._presence.change(+1)
 
     async def _deliver(self, envelope: Envelope) -> None:
         if envelope.to is None or envelope.to == self._token:
             await self._send(envelope.payload)
 
     async def _forget(self) -> None:
+        if self._counted and self._presence is not None:
+            self._counted = False
+            await self._presence.change(-1)
         if self._subscription is not None:
             await self._subscription.close()
         self._room = self._token = self._subscription = None

@@ -3,9 +3,10 @@
 import { OnlineGame, storedSeat } from "./online.js";
 import { startSolo } from "./solo.js";
 import { $, readRounds, show, toast, wireSteppers } from "./ui.js";
-import { isRoomCode } from "./views.js";
+import { isRoomCode, onlineLabel } from "./views.js";
 
 const NAME_KEY = "psr:name";
+const ONLINE_POLL_MS = 10_000;
 
 function remember(key, value) {
   try { localStorage.setItem(key, value); } catch { /* storage unavailable */ }
@@ -69,7 +70,32 @@ function wireOnlineSetup() {
   });
 }
 
+// Header banner: players in online rooms right now. Hidden if the server can't say.
+async function refreshOnlineCount() {
+  const el = $("online-count");
+  try {
+    const response = await fetch("/api/online", { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const { players } = await response.json();
+    el.textContent = onlineLabel(players);
+    el.hidden = false;
+  } catch {
+    el.hidden = true;
+  }
+}
+
+function watchOnlineCount() {
+  refreshOnlineCount();
+  setInterval(() => {
+    if (!document.hidden) refreshOnlineCount();
+  }, ONLINE_POLL_MS);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) refreshOnlineCount();
+  });
+}
+
 function main() {
+  watchOnlineCount();
   wireSteppers();
   wireSoloSetup();
   wireOnlineSetup();

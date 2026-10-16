@@ -361,3 +361,17 @@ legend { padding: 0 6px; color: var(--muted); font-size: 12px; text-transform: u
 .arena.live.outcome-lose .slot-left,
 .arena.live.outcome-win .slot-right { filter: grayscale(1) brightness(0.6); }
 .arena.live.outcome-draw .slot { box-shadow: 0 0 0 3px var(--draw); }
+
+/* --- header: live count of online players -------------------------------------- */
+.masthead-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.online-count {
+  margin: 0 0 6px; display: inline-flex; align-items: center; gap: 8px;
+  color: var(--muted); font-size: 12px; letter-spacing: 0.06em;
+}
+.online-count::before {
+  content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--win);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--win) 60%, transparent);
+  animation: online-pulse 2s ease-out infinite;
+}
+@keyframes online-pulse { to { box-shadow: 0 0 0 8px transparent; } }
+@media (prefers-reduced-motion: reduce) { .online-count::before { animation: none; } }

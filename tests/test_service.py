@@ -7,7 +7,12 @@ from conftest import BACKENDS, BackendFactory, run, wait_until
 
 from psr.moves import Move
 from psr.server.engine import Engine, Timing
-from psr.server.memory import MemoryEventBus, MemoryRoomStore, MemoryTimerQueue
+from psr.server.memory import (
+    MemoryEventBus,
+    MemoryPresenceBoard,
+    MemoryRoomStore,
+    MemoryTimerQueue,
+)
 from psr.server.ports import Backend, Envelope
 from psr.server.service import MAX_ATTEMPTS, TIMER_LEASE, ConflictError, RoomService
 from psr.server.state import Join, PlaceMove, ProtocolError, RoomState, Timer
@@ -157,7 +162,7 @@ class RacingStore:
 
 def _racing_backend() -> tuple[Backend, RacingStore]:
     store = RacingStore(Engine(TIMING), Clock())
-    return Backend(store, MemoryEventBus(), MemoryTimerQueue()), store
+    return Backend(store, MemoryEventBus(), MemoryTimerQueue(), MemoryPresenceBoard()), store
 
 
 class AlwaysStaleStore(RacingStore):
@@ -173,7 +178,9 @@ def test_gives_up_under_constant_contention_and_retries_the_timer_later() -> Non
         clock = Clock()
         store = AlwaysStaleStore(Engine(TIMING), clock)
         timers = MemoryTimerQueue()
-        service = RoomService(Backend(store, MemoryEventBus(), timers), Engine(TIMING), clock)
+        service = RoomService(
+            Backend(store, MemoryEventBus(), timers, MemoryPresenceBoard()), Engine(TIMING), clock
+        )
         code = await service.create_room(rounds=1)
 
         with pytest.raises(ConflictError):
@@ -191,7 +198,9 @@ def test_gives_up_under_constant_contention_and_retries_the_timer_later() -> Non
 def test_timer_for_a_deleted_room_is_dropped() -> None:
     async def scenario() -> None:
         clock = Clock()
-        backend = Backend(MemoryRoomStore(), MemoryEventBus(), MemoryTimerQueue())
+        backend = Backend(
+            MemoryRoomStore(), MemoryEventBus(), MemoryTimerQueue(), MemoryPresenceBoard()
+        )
         service = RoomService(backend, Engine(TIMING), clock)
         await backend.timers.schedule(Timer("GONE", "round", 1, at=clock.now))
         assert await service.fire_due_timers() == 1

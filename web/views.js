@@ -58,3 +58,9 @@ export const countdownLabel = (msLeft) => String(Math.ceil(msLeft / 1000));
 
 // Wait until the label next changes (the next whole-second boundary).
 export const nextTickMs = (msLeft) => Math.min(msLeft, msLeft % 1000 || 1000);
+
+// Header banner text for the number of players connected to online rooms.
+export function onlineLabel(players) {
+  if (players === 0) return "No one online yet";
+  return players === 1 ? "1 player online" : `${players} players online`;
+}

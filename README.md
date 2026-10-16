@@ -28,8 +28,8 @@ WebSocket upgrades to `/ws`). Browsers only allow the camera on `https://` or
 ## Testing
 
 ```sh
-uv run pytest                               # Python: 99 tests (+6 need real Redis), ~3 s
-node --test web/tests/*.test.js             # browser logic: 30 tests, no dependencies
+uv run pytest                               # Python: 103 tests (+7 need real Redis), ~4 s
+node --test web/tests/*.test.js             # browser logic: 31 tests, no dependencies
 uv run ruff check . && uv run ruff format --check . && uv run mypy   # lint + strict types
 
 uv run pytest --cov=psr --cov=scripts --cov-report=term-missing     # 97% line coverage
@@ -54,9 +54,9 @@ I/O-bound parts take their dependencies as arguments:
 | `test_rules.py`, `test_game.py`, `test_presentation.py` | Rule table validation, rounds, scoring, choosers (incl. the computer committing first), text |
 | `test_cli.py`, `test_web.py` | Console game end to end with fake I/O; the Pyodide session adapter |
 | `test_engine.py` | Every room rule: hidden moves and photos, latest move counts, deadline and grace, replay/abandon, rematch, leave, disconnect/resume, stale timers |
-| `test_backends.py` | Store compare-and-set, pub/sub routing, timer leases, for memory, fakeredis and (optionally) Redis |
+| `test_backends.py` | Store compare-and-set, pub/sub routing, timer leases, presence expiry, for memory, fakeredis and (optionally) Redis |
 | `test_service.py` | Two instances sharing a room, timer takeover after a crash, retry on conflict, giving up under contention |
-| `test_server_app.py` | Real WebSockets: full match, a match split across two instances, resume, leave, rematch, errors, health checks |
+| `test_server_app.py` | Real WebSockets: full match, a match split across two instances, photos, online count across instances, resume, leave, rematch, errors, health checks |
 | `test_scripts.py` | Site build, model download (incl. interrupted downloads), and the load test playing real matches against a live server |
 | `web/tests/*.test.js` | Gesture classification and fallback, debounce, hold detection, reveal/score views from each seat, countdown, reconnect backoff |
 
@@ -96,7 +96,8 @@ shows the move.
  players ─ WS ─► Traefik ─► app × N (stateless) ─► Redis
                                                    ├ room:{code}  state, compare-and-set
                                                    ├ events:*     pub/sub fan-out
-                                                   └ timers       leased sorted set
+                                                   ├ timers       leased sorted set
+                                                   └ online:{app} expiring player count
 ```
 
 - `server/engine.py` is the room's rules as a pure function `(state, command, now)
@@ -105,6 +106,9 @@ shows the move.
   version is unchanged, retrying on conflict, so any instance can handle any player.
 - Round deadlines live in a Redis sorted set. Claiming a timer leases it; if the
   instance dies, the timer comes due again and another instance fires it.
+- The header's "N players online" comes from `GET /api/online`: each instance
+  keeps an expiring count of its seated players in Redis and the endpoint sums
+  them, so a crashed instance drops out of the total within 15 s.
 - Without `PSR_REDIS_URL` the same code runs in memory as a single instance.
 
 Measured on a laptop, one in-memory instance: 1,500 concurrent matches (3,000

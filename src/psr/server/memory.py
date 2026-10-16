@@ -1,6 +1,8 @@
 """Single-process implementations of the ports: for one instance and for tests."""
 
+import time
 from collections import defaultdict
+from collections.abc import Callable
 
 from psr.server.ports import Backend, Envelope, Handler
 from psr.server.state import RoomState, Timer
@@ -83,5 +85,18 @@ class MemoryTimerQueue:
         self._due.pop(timer, None)
 
 
+class MemoryPresenceBoard:
+    def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
+        self._clock = clock
+        self._reports: dict[str, tuple[int, float]] = {}
+
+    async def report(self, instance: str, count: int, ttl: float) -> None:
+        self._reports[instance] = (count, self._clock() + ttl)
+
+    async def total(self) -> int:
+        now = self._clock()
+        return sum(count for count, expires in self._reports.values() if expires > now)
+
+
 def memory_backend() -> Backend:
-    return Backend(MemoryRoomStore(), MemoryEventBus(), MemoryTimerQueue())
+    return Backend(MemoryRoomStore(), MemoryEventBus(), MemoryTimerQueue(), MemoryPresenceBoard())

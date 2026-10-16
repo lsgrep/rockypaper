@@ -52,8 +52,17 @@ class TimerQueue(Protocol):
     async def complete(self, timer: Timer) -> None: ...
 
 
+class PresenceBoard(Protocol):
+    """Per-instance player counts that expire unless refreshed, summed across instances."""
+
+    async def report(self, instance: str, count: int, ttl: float) -> None: ...
+
+    async def total(self) -> int: ...
+
+
 @dataclass(frozen=True)
 class Backend:
     store: RoomStore
     bus: EventBus
     timers: TimerQueue
+    presence: PresenceBoard

@@ -218,3 +218,30 @@ def test_snapshots_must_be_small_jpeg_data_urls() -> None:
         ):
             ws.send_json({"type": "snapshot", "image": image})
             assert receive_until(ws, "error")["message"] == "Invalid message"
+
+
+def test_online_count_follows_seated_players_across_instances() -> None:
+    server = FakeServer()
+    first = create_app(redis=FakeRedis(server=server), timing=FAST, instance="app-1")
+    second = create_app(redis=FakeRedis(server=server), timing=FAST, instance="app-2")
+    with TestClient(first) as one, TestClient(second) as two:
+        assert one.get("/api/online").json() == {"players": 0}
+        with one.websocket_connect("/ws") as alice, two.websocket_connect("/ws") as bob:
+            alice.send_json({"type": "create", "name": "Alice", "rounds": 1})
+            code = receive_until(alice, "joined")["room"]
+            assert two.get("/api/online").json() == {"players": 1}
+            bob.send_json({"type": "join", "name": "Bob", "room": code})
+            receive_until(bob, "joined")
+            assert one.get("/api/online").json() == {"players": 2}
+
+            bob.send_json({"type": "leave"})
+            receive_until(alice, "notice")
+            assert one.get("/api/online").json() == {"players": 1}
+        assert two.get("/api/online").json() == {"players": 0}
+
+
+def test_failed_join_is_not_counted() -> None:
+    with TestClient(create_app(timing=FAST)) as client, client.websocket_connect("/ws") as ws:
+        ws.send_json({"type": "join", "name": "Zed", "room": "ZZZZ"})
+        receive_until(ws, "error")
+        assert client.get("/api/online").json() == {"players": 0}

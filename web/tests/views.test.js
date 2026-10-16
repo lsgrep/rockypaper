@@ -5,6 +5,7 @@ import {
   countdownLabel,
   isRoomCode,
   nextTickMs,
+  onlineLabel,
   onlineRevealView,
   outcomeForSeat,
   reconnectDelay,
@@ -148,5 +149,13 @@ describe("reconnectDelay", () => {
   it("backs off then gives up", () => {
     assert.deepEqual([0, 1, 2, 3, 4].map(reconnectDelay), [500, 1000, 2000, 4000, 8000]);
     assert.equal(reconnectDelay(5), null);
+  });
+});
+
+describe("onlineLabel", () => {
+  it("reads naturally for zero, one and many", () => {
+    assert.equal(onlineLabel(0), "No one online yet");
+    assert.equal(onlineLabel(1), "1 player online");
+    assert.equal(onlineLabel(12), "12 players online");
   });
 });

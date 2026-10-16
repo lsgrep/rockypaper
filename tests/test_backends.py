@@ -89,3 +89,21 @@ def test_timers_are_claimed_once_and_come_back_after_the_lease(
             assert await timers.claim_due(now=999.0, lease=5.0, limit=10) == [late]
 
     run(scenario)
+
+
+def test_presence_sums_live_instances_and_forgets_dead_ones(
+    make_backend: BackendFactory,
+) -> None:
+    async def scenario() -> None:
+        async with make_backend() as backend:
+            board = backend.presence
+            assert await board.total() == 0
+            await board.report("app-1", 3, ttl=0.2)
+            await board.report("app-2", 2, ttl=30)
+            assert await board.total() == 5
+            await board.report("app-1", 1, ttl=0.2)  # a newer report replaces the old one
+            assert await board.total() == 3
+            await asyncio.sleep(0.3)  # app-1 stopped reporting (crashed)
+            assert await board.total() == 2
+
+    run(scenario)

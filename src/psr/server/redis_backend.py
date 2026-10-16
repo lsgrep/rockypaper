@@ -2,6 +2,7 @@
 
 - Room state: a hash {v: version, s: JSON}, written by a Lua compare-and-set.
 - Events: one pattern subscription per instance; handlers filter by room.
+- Presence: one expiring counter key per instance, summed on read.
 - Timers: a sorted set scored by due time; claiming re-scores a timer to now + lease
   in one Lua call, so exactly one instance runs it, and it reappears if that one dies.
 """
@@ -23,6 +24,7 @@ log = logging.getLogger(__name__)
 ROOM_PREFIX = "psr:room:"
 EVENTS_PREFIX = "psr:events:"
 TIMERS_KEY = "psr:timers"
+PRESENCE_PREFIX = "psr:online:"
 ROOM_TTL_SECONDS = 6 * 60 * 60  # idle rooms disappear on their own
 
 SAVE_IF_VERSION = """
@@ -172,6 +174,20 @@ class RedisTimerQueue:
         await self._redis.zrem(TIMERS_KEY, _encode(timer))
 
 
+class RedisPresenceBoard:
+    def __init__(self, redis: Redis) -> None:
+        self._redis = redis
+
+    async def report(self, instance: str, count: int, ttl: float) -> None:
+        await self._redis.set(PRESENCE_PREFIX + instance, count, px=max(1, round(ttl * 1000)))
+
+    async def total(self) -> int:
+        keys = [key async for key in self._redis.scan_iter(match=PRESENCE_PREFIX + "*")]
+        if not keys:
+            return 0
+        return sum(int(value) for value in await self._redis.mget(keys) if value is not None)
+
+
 def _encode(timer: Timer) -> str:
     return json.dumps([timer.room, timer.name, timer.token, timer.at])
 
@@ -187,4 +203,5 @@ def _text(value: str | bytes) -> str:
 
 def redis_backend(redis: Redis) -> tuple[Backend, RedisEventBus]:
     bus = RedisEventBus(redis)
-    return Backend(RedisRoomStore(redis), bus, RedisTimerQueue(redis)), bus
+    backend = Backend(RedisRoomStore(redis), bus, RedisTimerQueue(redis), RedisPresenceBoard(redis))
+    return backend, bus
