@@ -26,6 +26,8 @@ def summarize(state: RoomState, now: float, rules: Rules = CLASSIC_RULES) -> Roo
     """What the homepage shows for a room, or None if it shouldn't be listed."""
     if not state.public or not state.seats or state.phase is Phase.FINISHED:
         return None
+    if len(state.seats) == 1 and not state.seats[0].connected:
+        return None  # the host dropped; don't invite people into an empty room
     wins, draws = _tally(state.history, rules)
     status: Literal["open", "live"] = "open" if len(state.seats) == 1 else "live"
     playing = state.phase is Phase.THROWING

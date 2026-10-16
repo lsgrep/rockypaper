@@ -51,3 +51,11 @@ def test_private_empty_and_finished_rooms_are_not_listed() -> None:
     assert summarize(room(1, public=False), now=0) is None
     assert summarize(room(0), now=0) is None
     assert summarize(room(2, Phase.FINISHED), now=0) is None
+
+
+def test_an_open_lobby_whose_host_dropped_is_hidden_until_they_return() -> None:
+    state = room(1)
+    state.seats[0].connected = False
+    assert summarize(state, now=0) is None
+    state.seats[0].connected = True
+    assert summarize(state, now=0) is not None
