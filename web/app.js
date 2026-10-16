@@ -7,6 +7,7 @@ import { isRoomCode, onlineLabel } from "./views.js";
 
 const NAME_KEY = "psr:name";
 const ONLINE_POLL_MS = 10_000;
+const PRESENCE_SETTLE_MS = 1_000;
 
 function remember(key, value) {
   try { localStorage.setItem(key, value); } catch { /* storage unavailable */ }
@@ -23,6 +24,7 @@ function goHome() {
 async function playSolo(rounds) {
   try {
     await startSolo(rounds, { onExit: goHome, onReplay: () => show("setup") });
+    setTimeout(refreshOnlineCount, PRESENCE_SETTLE_MS); // include ourselves right away
   } catch (error) {
     toast(`Could not start Python: ${error.message}`);
     goHome();
@@ -67,6 +69,7 @@ function wireOnlineSetup() {
       ? { type: "join", name, room: code }
       : { type: "create", name, rounds: readRounds($("online-rounds")) ?? 3 };
     new OnlineGame({ onExit: () => show("online-setup") }).start(request);
+    setTimeout(refreshOnlineCount, PRESENCE_SETTLE_MS);
   });
 }
 

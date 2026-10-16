@@ -1,6 +1,7 @@
 // Versus the computer: the Python game runs in the browser via Pyodide.
 
 import { ThrowInput, handCam } from "./hand-cam.js";
+import { announcePlaying } from "./net.js";
 import {
   $, CONCEALED, GLYPHS, clearOutcome, createMoveButtons, renderReveal, resetBoard, setBadge, setHand, setVerdict,
   show, showFinal,
@@ -56,9 +57,11 @@ export async function startSolo(rounds, { onExit, onReplay }) {
   const session = webModule.WebSession(rounds);
   const input = new ThrowInput();
   const stopped = new AbortController();
+  const endPresence = announcePlaying();
   const finish = (next) => () => {
     if (!stopped.signal.aborted) {
       stopped.abort();
+      endPresence();
       handCam.stop();
       session.destroy();
     }

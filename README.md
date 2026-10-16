@@ -28,7 +28,7 @@ WebSocket upgrades to `/ws`). Browsers only allow the camera on `https://` or
 ## Testing
 
 ```sh
-uv run pytest                               # Python: 103 tests (+7 need real Redis), ~4 s
+uv run pytest                               # Python: 106 tests (+7 need real Redis), ~4 s
 node --test web/tests/*.test.js             # browser logic: 31 tests, no dependencies
 uv run ruff check . && uv run ruff format --check . && uv run mypy   # lint + strict types
 
@@ -107,8 +107,10 @@ shows the move.
 - Round deadlines live in a Redis sorted set. Claiming a timer leases it; if the
   instance dies, the timer comes due again and another instance fires it.
 - The header's "N players online" comes from `GET /api/online`: each instance
-  keeps an expiring count of its seated players in Redis and the endpoint sums
-  them, so a crashed instance drops out of the total within 15 s.
+  keeps an expiring count of its players in Redis and the endpoint sums them, so
+  a crashed instance drops out of the total within 15 s. Players count while in
+  a room, or while playing the computer: that game runs in the browser, so it
+  keeps one WebSocket open saying `{"type": "playing"}`.
 - Without `PSR_REDIS_URL` the same code runs in memory as a single instance.
 
 Measured on a laptop, one in-memory instance: 1,500 concurrent matches (3,000

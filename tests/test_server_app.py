@@ -245,3 +245,32 @@ def test_failed_join_is_not_counted() -> None:
         ws.send_json({"type": "join", "name": "Zed", "room": "ZZZZ"})
         receive_until(ws, "error")
         assert client.get("/api/online").json() == {"players": 0}
+
+
+def test_players_vs_the_computer_are_counted_while_connected() -> None:
+    with TestClient(create_app(timing=FAST)) as client:
+        with client.websocket_connect("/ws") as solo:
+            solo.send_json({"type": "playing"})
+            solo.send_json({"type": "playing"})  # repeated announcements count once
+            solo.send_json({"type": "move", "move": "rock"})  # round-trip so both are handled
+            receive_until(solo, "error")
+            assert client.get("/api/online").json() == {"players": 1}
+        assert client.get("/api/online").json() == {"players": 0}
+
+
+def test_a_solo_player_who_joins_a_room_is_counted_once() -> None:
+    with TestClient(create_app(timing=FAST)) as client, client.websocket_connect("/ws") as ws:
+        ws.send_json({"type": "playing"})
+        ws.send_json({"type": "create", "name": "Alice", "rounds": 1})
+        receive_until(ws, "joined")
+        assert client.get("/api/online").json() == {"players": 1}
+
+
+def test_site_files_are_revalidated_but_the_model_is_cached(tmp_path: Path) -> None:
+    (tmp_path / "index.html").write_text("<h1>hi</h1>")
+    (tmp_path / "vendor").mkdir()
+    (tmp_path / "vendor" / "model.task").write_bytes(b"weights")
+    with TestClient(create_app(static_dir=tmp_path)) as client:
+        assert client.get("/").headers["cache-control"] == "no-cache"
+        assert client.get("/api/online").headers["cache-control"] == "no-cache"
+        assert "max-age=86400" in client.get("/vendor/model.task").headers["cache-control"]

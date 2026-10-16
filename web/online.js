@@ -2,6 +2,7 @@
 // its current move; at the deadline the server judges and reveals both moves at once.
 
 import { ThrowInput, handCam } from "./hand-cam.js";
+import { socketUrl } from "./net.js";
 import {
   $, CONCEALED, GLYPHS, clearOutcome, createMoveButtons, renderReveal, resetBoard, setBadge,
   setHand, setRound, setScore, setVerdict, show, showFinal, toast,
@@ -11,7 +12,6 @@ import { onlineRevealView, reconnectDelay, scoreForSeat } from "./views.js";
 const MOVES = ["rock", "paper", "scissors"];
 const SEAT_KEY = (room) => `psr:seat:${room}`;
 
-const socketUrl = () => `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
 
 function storeSeat(room, token) {
   try { sessionStorage.setItem(SEAT_KEY(room), token); } catch { /* storage unavailable */ }

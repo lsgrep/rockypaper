@@ -73,8 +73,21 @@ class LeaveRoom(Message):
     type: Literal["leave"] = "leave"
 
 
+class Playing(Message):
+    """This connection is a player outside any room (versus the computer), for the count."""
+
+    type: Literal["playing"] = "playing"
+
+
 ClientMessage = Annotated[
-    CreateRoom | JoinRoom | ResumeSeat | SetMove | SendSnapshot | RequestRematch | LeaveRoom,
+    CreateRoom
+    | JoinRoom
+    | ResumeSeat
+    | SetMove
+    | SendSnapshot
+    | RequestRematch
+    | LeaveRoom
+    | Playing,
     Field(discriminator="type"),
 ]
 CLIENT_MESSAGE: TypeAdapter[ClientMessage] = TypeAdapter(ClientMessage)

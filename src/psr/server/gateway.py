@@ -11,6 +11,7 @@ from psr.server.protocol import (
     CreateRoom,
     JoinRoom,
     LeaveRoom,
+    Playing,
     RequestRematch,
     ResumeSeat,
     SendSnapshot,
@@ -72,6 +73,8 @@ class Gateway:
                 room, token = self._seated()
                 await self._service.execute(room, Leave(token))
                 await self._forget()
+            case Playing():
+                await self._count()
 
     async def close(self) -> None:
         """The socket closed: keep the seat for a while so the player can resume."""
@@ -89,7 +92,11 @@ class Gateway:
         except Exception:
             await self._forget()
             raise
-        if self._presence is not None:
+        await self._count()
+
+    async def _count(self) -> None:
+        """Count this connection as one online player (at most once)."""
+        if self._presence is not None and not self._counted:
             self._counted = True
             await self._presence.change(+1)
 

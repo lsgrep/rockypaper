@@ -15,9 +15,10 @@ import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
@@ -35,6 +36,7 @@ from psr.server.state import ProtocolError
 
 log = logging.getLogger(__name__)
 TIMER_POLL_SECONDS = 0.05
+VENDOR_CACHE = "public, max-age=86400"  # the 26 MB model rarely changes
 INSTANCE = os.environ.get("PSR_INSTANCE", socket.gethostname())
 
 
@@ -101,6 +103,14 @@ def create_app(
 
     app = FastAPI(title="Paper Scissors Rock", lifespan=lifespan)
 
+    @app.middleware("http")
+    async def cache_headers(request: Request, call_next: Callable[[Request], Any]) -> Response:
+        """Revalidate pages and code on every load (cheap 304s), so a deploy shows up at once."""
+        response: Response = await call_next(request)
+        vendor = request.url.path.startswith("/vendor/")
+        response.headers.setdefault("Cache-Control", VENDOR_CACHE if vendor else "no-cache")
+        return response
+
     @app.get("/healthz")
     async def healthz() -> JSONResponse:
         if redis is not None:
@@ -112,7 +122,7 @@ def create_app(
 
     @app.get("/api/online")
     async def online() -> JSONResponse:
-        """Players currently connected to a room, summed over all instances."""
+        """Players in a room or playing the computer, summed over all instances."""
         return JSONResponse({"players": await presence.total()})
 
     @app.websocket("/ws")
