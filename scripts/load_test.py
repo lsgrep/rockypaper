@@ -18,8 +18,10 @@ from typing import Any
 
 import websockets
 
+from psr.server.engine import Timing
+
 MOVES = ["rock", "paper", "scissors"]
-GRACE_SECONDS = 0.5
+GRACE_SECONDS = Timing().grace  # the server waits this long after the countdown
 
 
 @dataclass
