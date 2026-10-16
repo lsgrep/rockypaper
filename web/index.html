@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Paper Scissors Rock</title>
+  <meta name="description" content="Play Paper Scissors Rock against the computer or a friend, throwing with your camera.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✊</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="fx.js" defer></script>
+  <script src="app.js" type="module"></script>
+</head>
+<body>
+  <canvas id="fx" aria-hidden="true"></canvas>
+  <main class="shell">
+    <header class="masthead">
+      <p class="eyebrow">Best of n</p>
+      <h1>Paper <span>Scissors</span> Rock</h1>
+    </header>
+
+    <section id="home" class="panel">
+      <p class="lede">Choose your opponent</p>
+      <div class="modes">
+        <button type="button" class="mode" data-mode="solo">
+          <span class="glyph">🤖</span><b>vs Computer</b><small>Python, running in your browser</small>
+        </button>
+        <button type="button" class="mode" data-mode="online">
+          <span class="glyph">📷</span><b>vs a friend</b><small>Live, throw with your camera</small>
+        </button>
+      </div>
+    </section>
+
+    <section id="loading" class="panel" hidden>
+      <div class="spinner" aria-hidden="true"></div>
+      <p>Starting the Python runtime…</p>
+    </section>
+
+    <section id="setup" class="panel" hidden>
+      <form id="setup-form" class="stack">
+        <label for="rounds">How many rounds?</label>
+        <div class="stepper">
+          <button type="button" data-step="-1" aria-label="Fewer rounds">−</button>
+          <input id="rounds" type="number" min="1" max="99" value="5" required inputmode="numeric">
+          <button type="button" data-step="1" aria-label="More rounds">+</button>
+        </div>
+        <div class="presets">
+          <button type="button" data-preset="1">1</button>
+          <button type="button" data-preset="3">3</button>
+          <button type="button" data-preset="5">5</button>
+          <button type="button" data-preset="10">10</button>
+        </div>
+        <button type="submit" class="primary">Start match</button>
+        <button type="button" class="link" data-home>← Back</button>
+      </form>
+    </section>
+
+    <section id="online-setup" class="panel" hidden>
+      <form id="online-form" class="stack" novalidate>
+        <label for="player-name">Your name</label>
+        <input id="player-name" class="text" maxlength="20" required autocomplete="nickname" placeholder="e.g. Ada">
+        <div class="split">
+          <fieldset>
+            <legend>New room</legend>
+            <div class="stepper">
+              <button type="button" data-step="-1" aria-label="Fewer rounds">−</button>
+              <input id="online-rounds" type="number" min="1" max="99" value="3" inputmode="numeric" aria-label="Rounds">
+              <button type="button" data-step="1" aria-label="More rounds">+</button>
+            </div>
+            <button type="submit" value="create" class="primary">Create room</button>
+          </fieldset>
+          <fieldset>
+            <legend>Have a code?</legend>
+            <input id="room-code" class="text code-input" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="K7QX" aria-label="Room code">
+            <button type="submit" value="join" class="primary ghost">Join room</button>
+          </fieldset>
+        </div>
+        <p id="online-error" class="error" role="alert"></p>
+        <button type="button" class="link" data-home>← Back</button>
+      </form>
+    </section>
+
+    <section id="lobby" class="panel" hidden>
+      <p class="eyebrow">Room code</p>
+      <p id="lobby-code" class="room-code">····</p>
+      <button id="copy-link" type="button" class="primary ghost">Copy invite link</button>
+      <ul id="lobby-players" class="players"></ul>
+      <p class="waiting"><span class="spinner" aria-hidden="true"></span> Waiting for an opponent…</p>
+      <button id="lobby-leave" type="button" class="link">Leave room</button>
+    </section>
+
+    <section id="play" class="panel" hidden>
+      <div class="play-main">
+        <button id="quit" type="button" class="link quit">← Leave</button>
+        <div class="scoreboard" aria-live="polite">
+          <div class="side"><span id="name-left" class="who">You</span><span id="score-left" class="num">0</span></div>
+          <div class="mid">
+            <span id="round-label" class="round">Round 1 / 5</span>
+            <span class="draws">Draws <b id="score-draws">0</b></span>
+          </div>
+          <div class="side"><span id="name-right" class="who">Computer</span><span id="score-right" class="num">0</span></div>
+        </div>
+
+        <div class="arena" id="arena">
+          <div class="slot">
+            <video id="camera" playsinline muted></video>
+            <canvas id="camera-overlay" aria-hidden="true"></canvas>
+            <div class="hand" id="hand-left" aria-label="Your move">✊</div>
+            <span class="badge" id="badge-left" hidden></span>
+          </div>
+          <div class="vs">vs</div>
+          <div class="slot">
+            <div class="hand mirrored" id="hand-right" aria-label="Opponent's move">✊</div>
+            <span class="badge" id="badge-right" hidden></span>
+          </div>
+          <div id="countdown" class="countdown" aria-live="assertive" hidden></div>
+        </div>
+        <p id="camera-status" class="camera-status" hidden></p>
+        <p id="verdict" class="verdict" aria-live="polite">Pick your move.</p>
+
+        <div id="moves" class="moves" role="group" aria-label="Choose your move"></div>
+
+        <div id="final" class="final" hidden>
+          <p id="summary"></p>
+          <div class="final-actions">
+            <button id="again" type="button" class="primary">Play again</button>
+            <button id="leave" type="button" class="link">Leave</button>
+          </div>
+        </div>
+
+      </div>
+      <aside class="play-side" aria-label="Round history">
+        <h2 class="side-title">Rounds</h2>
+        <ol id="history" class="history" reversed></ol>
+      </aside>
+    </section>
+
+    <p id="toast" class="toast" role="status" hidden></p>
+    <footer class="foot">Rules decided in Python · hands read on-device with MediaPipe</footer>
+  </main>
+</body>
+</html>

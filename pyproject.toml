@@ -1,0 +1,47 @@
+[project]
+name = "psr"
+version = "1.0.0"
+description = "Paper Scissors Rock: a human plays the computer for n rounds."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.143.3",
+    "pydantic>=2.14.1",
+    "redis>=5",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[project.scripts]
+psr = "psr.cli:main"
+psr-server = "psr.server.app:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "pytest-timeout>=2.4.0",
+    "httpx2>=2.13.1",
+    "fakeredis[lua]>=2.40.0",
+    "websockets>=17.2",
+    "pytest-cov>=7.1.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+files = ["src", "tests", "scripts"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["scripts"]

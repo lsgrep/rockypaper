@@ -1,0 +1,153 @@
+"""Messages exchanged over the WebSocket, validated with Pydantic.
+
+The server never tells a client the opponent's move before the round's deadline:
+`PlayerReady` only says *that* a seat has a move, `RoundRevealed` carries both.
+"""
+
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, TypeAdapter
+
+from psr.moves import Move
+
+PlayerName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)]
+RoomCode = Annotated[
+    str, StringConstraints(strip_whitespace=True, to_upper=True, pattern=r"^[A-Za-z0-9]{4}$")
+]
+SeatToken = Annotated[str, StringConstraints(min_length=16, max_length=64)]
+MAX_ROUNDS = 99
+
+
+class Message(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+# --- client → server -------------------------------------------------------
+
+
+class CreateRoom(Message):
+    type: Literal["create"] = "create"
+    name: PlayerName
+    rounds: Annotated[int, Field(ge=1, le=MAX_ROUNDS)]
+
+
+class JoinRoom(Message):
+    type: Literal["join"] = "join"
+    name: PlayerName
+    room: RoomCode
+
+
+class ResumeSeat(Message):
+    """Reconnect to a seat after a dropped connection."""
+
+    type: Literal["resume"] = "resume"
+    room: RoomCode
+    token: SeatToken
+
+
+class SetMove(Message):
+    """The player's current move; may change until the round's deadline."""
+
+    type: Literal["move"] = "move"
+    move: Move
+
+
+class RequestRematch(Message):
+    type: Literal["rematch"] = "rematch"
+
+
+class LeaveRoom(Message):
+    type: Literal["leave"] = "leave"
+
+
+ClientMessage = Annotated[
+    CreateRoom | JoinRoom | ResumeSeat | SetMove | RequestRematch | LeaveRoom,
+    Field(discriminator="type"),
+]
+CLIENT_MESSAGE: TypeAdapter[ClientMessage] = TypeAdapter(ClientMessage)
+
+
+# --- server → client -------------------------------------------------------
+
+
+class Joined(Message):
+    type: Literal["joined"] = "joined"
+    room: str
+    seat: int
+    rounds: int
+    token: str  # secret; lets this client resume the seat after reconnecting
+
+
+class Lobby(Message):
+    type: Literal["lobby"] = "lobby"
+    players: list[str]
+
+
+class RoundStarted(Message):
+    type: Literal["round"] = "round"
+    round: int
+    rounds: int
+    countdown_ms: int
+    replay: bool = False
+
+
+class PlayerReady(Message):
+    type: Literal["ready"] = "ready"
+    seat: int
+
+
+class Score(Message):
+    wins: list[int]
+    draws: int
+
+
+class RoundRevealed(Message):
+    type: Literal["reveal"] = "reveal"
+    round: int
+    rounds: int
+    moves: list[Move]
+    winner: int | None
+    rule: str | None
+    score: Score
+    is_over: bool
+    summary: str | None
+
+
+class RematchRequested(Message):
+    type: Literal["rematch"] = "rematch"
+    seat: int
+
+
+class Sync(Message):
+    """Snapshot sent to a client that resumed its seat."""
+
+    type: Literal["sync"] = "sync"
+    phase: str
+    round: int
+    rounds: int
+    score: Score
+    remaining_ms: int | None
+    your_move: Move | None
+
+
+class Notice(Message):
+    type: Literal["notice"] = "notice"
+    text: str
+
+
+class ErrorMessage(Message):
+    type: Literal["error"] = "error"
+    message: str
+
+
+ServerMessage = (
+    Joined
+    | Lobby
+    | RoundStarted
+    | PlayerReady
+    | RoundRevealed
+    | RematchRequested
+    | Sync
+    | Notice
+    | ErrorMessage
+)

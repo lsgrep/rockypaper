@@ -1,0 +1,31 @@
+# Production overlay: HTTPS via Let's Encrypt (needed for the camera off localhost).
+#   PSR_DOMAIN=play.example.com [ACME_EMAIL=you@example.com] \
+#   docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+services:
+  traefik:
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.le.acme.tlschallenge=true
+      - --certificatesresolvers.le.acme.email=${ACME_EMAIL:-}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --ping=true
+    ports: !override
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt:/letsencrypt
+
+  app:
+    labels:
+      traefik.http.routers.psr.rule: Host(`${PSR_DOMAIN:?set PSR_DOMAIN}`)
+      traefik.http.routers.psr.entrypoints: websecure
+      traefik.http.routers.psr.tls.certresolver: le
+
+volumes:
+  letsencrypt:

@@ -1,0 +1,44 @@
+# Local / staging: Traefik → N stateless app replicas → Redis.
+#   docker-compose up --build --scale app=3     (http://localhost:8080)
+services:
+  traefik:
+    image: traefik:v3.6.2
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --ping=true
+    ports:
+      - "${PSR_HTTP_PORT:-8080}:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+    restart: unless-stopped
+
+  app:
+    build: .
+    environment:
+      PSR_REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      replicas: 2
+    restart: unless-stopped
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.psr.rule: PathPrefix(`/`)
+      traefik.http.routers.psr.entrypoints: web
+      traefik.http.services.psr.loadbalancer.server.port: "8000"
+      traefik.http.services.psr.loadbalancer.healthcheck.path: /healthz
+      traefik.http.services.psr.loadbalancer.healthcheck.interval: 5s
